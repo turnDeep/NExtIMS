@@ -83,21 +83,69 @@ def parse_bde_db2_csv(csv_file, max_molecules=0):
     return molecules
 
 
-def create_sdf_file(molecules, output_path):
-    """Create molecules.sdf file with 3D conformers
+def collect_all_molecules(molecules_dict):
+    """
+    Collect all unique molecules (parents + fragments) from the BDE data
+
+    Args:
+        molecules_dict: Dictionary of parent molecule SMILES and their BDE data
 
     Returns:
-        tuple: (mol_count, successful_smiles_set) - number of molecules written and set of successful SMILES
+        tuple: (all_molecules_set, smiles_to_index) where:
+            - all_molecules_set: Set of all unique SMILES (parents + fragments)
+            - smiles_to_index: Dictionary mapping SMILES to index for BonDNet
+    """
+    logger.info("Collecting all molecules (parents + fragments)...")
+
+    all_molecules = set()
+
+    # Add parent molecules
+    for smiles in molecules_dict.keys():
+        all_molecules.add(smiles)
+
+    # Add fragments
+    for smiles, bde_list in tqdm(molecules_dict.items(), desc="Collecting fragments"):
+        for bde_entry in bde_list:
+            frag1 = bde_entry['fragment1']
+            frag2 = bde_entry['fragment2']
+
+            if frag1 and not pd.isna(frag1):
+                all_molecules.add(frag1)
+            if frag2 and not pd.isna(frag2):
+                all_molecules.add(frag2)
+
+    logger.info(f"Total unique molecules (parents + fragments): {len(all_molecules):,}")
+
+    # Create SMILES to index mapping
+    # Sort for reproducibility
+    all_molecules_list = sorted(list(all_molecules))
+    smiles_to_index = {smiles: idx for idx, smiles in enumerate(all_molecules_list)}
+
+    logger.info(f"Created SMILES to index mapping for {len(smiles_to_index):,} molecules")
+
+    return all_molecules_list, smiles_to_index
+
+
+def create_sdf_file(all_molecules_list, output_path):
+    """Create molecules.sdf file with 3D conformers for all molecules (parents + fragments)
+
+    Args:
+        all_molecules_list: List of all unique SMILES (parents + fragments)
+        output_path: Path to output SDF file
+
+    Returns:
+        tuple: (mol_count, successful_smiles_list) - number of molecules written and list of successful SMILES in order
     """
     logger.info("Generating molecules.sdf with 3D coordinates...")
+    logger.info(f"Processing {len(all_molecules_list):,} unique molecules (parents + fragments)")
 
     writer = Chem.SDWriter(str(output_path))
 
     mol_count = 0
     failed_count = 0
-    successful_smiles = set()  # Track successful molecules
+    successful_smiles = []  # Track successful molecules IN ORDER
 
-    for smiles, bde_list in tqdm(molecules.items(), desc="Generating SDF"):
+    for smiles in tqdm(all_molecules_list, desc="Generating SDF"):
         try:
             # Parse SMILES
             mol = Chem.MolFromSmiles(smiles)
@@ -129,11 +177,10 @@ def create_sdf_file(molecules, output_path):
             # Set properties
             mol.SetProp("_Name", smiles)
             mol.SetProp("SMILES", smiles)
-            mol.SetProp("NumBDEs", str(len(bde_list)))
 
             writer.write(mol)
             mol_count += 1
-            successful_smiles.add(smiles)  # Track success
+            successful_smiles.append(smiles)  # Track success IN ORDER
 
         except Exception as e:
             logger.debug(f"Failed to process {smiles}: {e}")
@@ -148,23 +195,19 @@ def create_sdf_file(molecules, output_path):
     return mol_count, successful_smiles
 
 
-def create_molecule_attributes(molecules, output_path, successful_smiles=None):
+def create_molecule_attributes(successful_smiles_list, output_path):
     """Create molecule_attributes.yaml
 
     Args:
-        molecules: Dictionary of molecule SMILES and BDE data
+        successful_smiles_list: List of SMILES that were successfully written to SDF (in order)
         output_path: Path to output YAML file
-        successful_smiles: Set of SMILES that were successfully written to SDF (optional filter)
     """
     logger.info("Creating molecule_attributes.yaml...")
 
-    # BonDNet expects a LIST of dictionaries, not a dict of dicts
+    # BonDNet expects a LIST of dictionaries, in the same order as molecules.sdf
     attributes = []
 
-    for smiles, bde_list in tqdm(molecules.items(), desc="Processing attributes"):
-        # Skip molecules that failed SDF generation
-        if successful_smiles is not None and smiles not in successful_smiles:
-            continue
+    for smiles in tqdm(successful_smiles_list, desc="Processing attributes"):
 
         try:
             mol = Chem.MolFromSmiles(smiles)
@@ -172,14 +215,13 @@ def create_molecule_attributes(molecules, output_path, successful_smiles=None):
                 continue
 
             # Calculate molecular properties
-            # BonDNet expects list format, not dict
+            # BonDNet expects list format, in same order as molecules.sdf
             attributes.append({
                 'smiles': smiles,
-                'charge': 0,  # BDE-db2 uses neutral molecules
+                'charge': 0,  # Neutral molecules (fragments might have radicals, but charge=0)
                 'num_atoms': mol.GetNumAtoms(),
                 'num_bonds': mol.GetNumBonds(),
-                'molecular_weight': Descriptors.MolWt(mol),
-                'num_bdes': len(bde_list)
+                'molecular_weight': Descriptors.MolWt(mol)
             })
 
         except Exception as e:
@@ -195,30 +237,44 @@ def create_molecule_attributes(molecules, output_path, successful_smiles=None):
     return len(attributes)
 
 
-def create_reactions_file(molecules, output_path, successful_smiles=None):
-    """Create reactions.yaml with BDE data
+def create_reactions_file(molecules_dict, output_path, smiles_to_index):
+    """Create reactions.yaml with BDE data using molecule indices
 
     Args:
-        molecules: Dictionary of molecule SMILES and BDE data
+        molecules_dict: Dictionary of parent molecule SMILES and their BDE data
         output_path: Path to output YAML file
-        successful_smiles: Set of SMILES that were successfully written to SDF (optional filter)
+        smiles_to_index: Dictionary mapping SMILES to index in molecules.sdf
     """
     logger.info("Creating reactions.yaml...")
 
     reactions = []
     reaction_count = 0
+    skipped_count = 0
 
-    for smiles, bde_list in tqdm(molecules.items(), desc="Processing reactions"):
-        # Skip molecules that failed SDF generation
-        if successful_smiles is not None and smiles not in successful_smiles:
+    for parent_smiles, bde_list in tqdm(molecules_dict.items(), desc="Processing reactions"):
+        # Skip parent molecule if not in index (failed SDF generation)
+        if parent_smiles not in smiles_to_index:
+            skipped_count += len(bde_list)
             continue
 
+        parent_idx = smiles_to_index[parent_smiles]
+
         for bde_entry in bde_list:
-            # BonDNet expects 'energy' key for BDE value
-            # We use bde_enthalpy as the primary energy value
+            frag1_smiles = bde_entry['fragment1']
+            frag2_smiles = bde_entry['fragment2']
+
+            # Skip if fragments not in index (failed SDF generation)
+            if frag1_smiles not in smiles_to_index or frag2_smiles not in smiles_to_index:
+                skipped_count += 1
+                continue
+
+            frag1_idx = smiles_to_index[frag1_smiles]
+            frag2_idx = smiles_to_index[frag2_smiles]
+
+            # BonDNet expects reactants and products as INTEGER INDICES
             reaction = {
-                'reactants': [smiles],
-                'products': [bde_entry['fragment1'], bde_entry['fragment2']],
+                'reactants': [parent_idx],  # Index, not SMILES
+                'products': [frag1_idx, frag2_idx],  # Indices, not SMILES
                 'energy': bde_entry['bde_enthalpy'],  # BonDNet expects this key
                 'bond_index': bde_entry['bond_index'],
                 'bde_enthalpy': bde_entry['bde_enthalpy'],  # Keep for reference
@@ -235,6 +291,8 @@ def create_reactions_file(molecules, output_path, successful_smiles=None):
 
     logger.info(f"✓ Created {output_path}")
     logger.info(f"  Reactions: {reaction_count:,}")
+    if skipped_count > 0:
+        logger.info(f"  Skipped (missing fragments): {skipped_count:,}")
 
     return reaction_count
 
@@ -441,35 +499,42 @@ def main():
     logger.info("")
 
     # Step 1: Parse CSV
-    molecules = parse_bde_db2_csv(input_file, args.max_molecules)
+    molecules_dict = parse_bde_db2_csv(input_file, args.max_molecules)
+
+    # Step 2: Collect all molecules (parents + fragments) and create index mapping
+    all_molecules_list, smiles_to_index = collect_all_molecules(molecules_dict)
 
     stats = {}
-    successful_smiles = None
 
-    # Step 2: Create SDF file
+    # Step 3: Create SDF file with all molecules (parents + fragments)
     if not args.skip_sdf:
         sdf_path = output_dir / "molecules.sdf"
-        mol_count, successful_smiles = create_sdf_file(molecules, sdf_path)
+        mol_count, successful_smiles_list = create_sdf_file(all_molecules_list, sdf_path)
         stats['molecules'] = mol_count
+
+        # Update smiles_to_index to only include successful molecules
+        smiles_to_index = {smiles: idx for idx, smiles in enumerate(successful_smiles_list)}
     else:
-        logger.info("Skipping SDF generation (--skip-sdf)")
-        stats['molecules'] = len(molecules)
-        # If skipping SDF, use all molecules
-        successful_smiles = None
+        logger.warning("--skip-sdf option is deprecated with fragment support")
+        logger.warning("Regenerating SDF file anyway to ensure consistency")
+        sdf_path = output_dir / "molecules.sdf"
+        mol_count, successful_smiles_list = create_sdf_file(all_molecules_list, sdf_path)
+        stats['molecules'] = mol_count
+        smiles_to_index = {smiles: idx for idx, smiles in enumerate(successful_smiles_list)}
 
-    # Step 3: Create molecule attributes (only for molecules in SDF)
+    # Step 4: Create molecule attributes (only for successful molecules, in order)
     attr_path = output_dir / "molecule_attributes.yaml"
-    create_molecule_attributes(molecules, attr_path, successful_smiles)
+    create_molecule_attributes(successful_smiles_list, attr_path)
 
-    # Step 4: Create reactions file (only for molecules in SDF)
+    # Step 5: Create reactions file using indices
     rxn_path = output_dir / "reactions.yaml"
-    reaction_count = create_reactions_file(molecules, rxn_path, successful_smiles)
+    reaction_count = create_reactions_file(molecules_dict, rxn_path, smiles_to_index)
     stats['reactions'] = reaction_count
 
-    # Step 5: Create training script
+    # Step 6: Create training script
     create_training_script(output_dir)
 
-    # Step 6: Create README
+    # Step 7: Create README
     create_readme(output_dir, stats)
 
     # Summary
