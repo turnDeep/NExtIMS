@@ -158,7 +158,8 @@ def create_molecule_attributes(molecules, output_path, successful_smiles=None):
     """
     logger.info("Creating molecule_attributes.yaml...")
 
-    attributes = {}
+    # BonDNet expects a LIST of dictionaries, not a dict of dicts
+    attributes = []
 
     for smiles, bde_list in tqdm(molecules.items(), desc="Processing attributes"):
         # Skip molecules that failed SDF generation
@@ -171,19 +172,20 @@ def create_molecule_attributes(molecules, output_path, successful_smiles=None):
                 continue
 
             # Calculate molecular properties
-            attributes[smiles] = {
+            # BonDNet expects list format, not dict
+            attributes.append({
                 'smiles': smiles,
                 'charge': 0,  # BDE-db2 uses neutral molecules
                 'num_atoms': mol.GetNumAtoms(),
                 'num_bonds': mol.GetNumBonds(),
                 'molecular_weight': Descriptors.MolWt(mol),
                 'num_bdes': len(bde_list)
-            }
+            })
 
         except Exception as e:
             logger.debug(f"Failed to process attributes for {smiles}: {e}")
 
-    # Write YAML
+    # Write YAML as a list
     with open(output_path, 'w') as f:
         yaml.dump(attributes, f, default_flow_style=False, sort_keys=False)
 
