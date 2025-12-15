@@ -39,6 +39,8 @@ ENV/
 data/processed/*.pkl
 data/processed/*.h5
 data/processed/*.hdf5
+data/external/
+data/processed/bondnet_training/
 
 # Jupyter Notebook
 .ipynb_checkpoints
