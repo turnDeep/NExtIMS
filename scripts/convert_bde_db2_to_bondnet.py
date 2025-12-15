@@ -84,13 +84,18 @@ def parse_bde_db2_csv(csv_file, max_molecules=0):
 
 
 def create_sdf_file(molecules, output_path):
-    """Create molecules.sdf file with 3D conformers"""
+    """Create molecules.sdf file with 3D conformers
+
+    Returns:
+        tuple: (mol_count, successful_smiles_set) - number of molecules written and set of successful SMILES
+    """
     logger.info("Generating molecules.sdf with 3D coordinates...")
 
     writer = Chem.SDWriter(str(output_path))
 
     mol_count = 0
     failed_count = 0
+    successful_smiles = set()  # Track successful molecules
 
     for smiles, bde_list in tqdm(molecules.items(), desc="Generating SDF"):
         try:
@@ -128,6 +133,7 @@ def create_sdf_file(molecules, output_path):
 
             writer.write(mol)
             mol_count += 1
+            successful_smiles.add(smiles)  # Track success
 
         except Exception as e:
             logger.debug(f"Failed to process {smiles}: {e}")
@@ -139,16 +145,26 @@ def create_sdf_file(molecules, output_path):
     logger.info(f"  Molecules written: {mol_count:,}")
     logger.info(f"  Failed: {failed_count:,}")
 
-    return mol_count
+    return mol_count, successful_smiles
 
 
-def create_molecule_attributes(molecules, output_path):
-    """Create molecule_attributes.yaml"""
+def create_molecule_attributes(molecules, output_path, successful_smiles=None):
+    """Create molecule_attributes.yaml
+
+    Args:
+        molecules: Dictionary of molecule SMILES and BDE data
+        output_path: Path to output YAML file
+        successful_smiles: Set of SMILES that were successfully written to SDF (optional filter)
+    """
     logger.info("Creating molecule_attributes.yaml...")
 
     attributes = {}
 
     for smiles, bde_list in tqdm(molecules.items(), desc="Processing attributes"):
+        # Skip molecules that failed SDF generation
+        if successful_smiles is not None and smiles not in successful_smiles:
+            continue
+
         try:
             mol = Chem.MolFromSmiles(smiles)
             if mol is None:
@@ -177,14 +193,24 @@ def create_molecule_attributes(molecules, output_path):
     return len(attributes)
 
 
-def create_reactions_file(molecules, output_path):
-    """Create reactions.yaml with BDE data"""
+def create_reactions_file(molecules, output_path, successful_smiles=None):
+    """Create reactions.yaml with BDE data
+
+    Args:
+        molecules: Dictionary of molecule SMILES and BDE data
+        output_path: Path to output YAML file
+        successful_smiles: Set of SMILES that were successfully written to SDF (optional filter)
+    """
     logger.info("Creating reactions.yaml...")
 
     reactions = []
     reaction_count = 0
 
     for smiles, bde_list in tqdm(molecules.items(), desc="Processing reactions"):
+        # Skip molecules that failed SDF generation
+        if successful_smiles is not None and smiles not in successful_smiles:
+            continue
+
         for bde_entry in bde_list:
             reaction = {
                 'reactants': [smiles],
@@ -413,23 +439,26 @@ def main():
     molecules = parse_bde_db2_csv(input_file, args.max_molecules)
 
     stats = {}
+    successful_smiles = None
 
     # Step 2: Create SDF file
     if not args.skip_sdf:
         sdf_path = output_dir / "molecules.sdf"
-        mol_count = create_sdf_file(molecules, sdf_path)
+        mol_count, successful_smiles = create_sdf_file(molecules, sdf_path)
         stats['molecules'] = mol_count
     else:
         logger.info("Skipping SDF generation (--skip-sdf)")
         stats['molecules'] = len(molecules)
+        # If skipping SDF, use all molecules
+        successful_smiles = None
 
-    # Step 3: Create molecule attributes
+    # Step 3: Create molecule attributes (only for molecules in SDF)
     attr_path = output_dir / "molecule_attributes.yaml"
-    create_molecule_attributes(molecules, attr_path)
+    create_molecule_attributes(molecules, attr_path, successful_smiles)
 
-    # Step 4: Create reactions file
+    # Step 4: Create reactions file (only for molecules in SDF)
     rxn_path = output_dir / "reactions.yaml"
-    reaction_count = create_reactions_file(molecules, rxn_path)
+    reaction_count = create_reactions_file(molecules, rxn_path, successful_smiles)
     stats['reactions'] = reaction_count
 
     # Step 5: Create training script
