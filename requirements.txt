@@ -33,7 +33,10 @@ ogb>=1.3.6
 # Note: DGLが先にインストールされている必要があります
 # インストール手順:
 #   pip install git+https://github.com/mjwen/bondnet.git
+#   pip install pymatgen openbabel-wheel  # BonDNetの追加依存関係
 # Docker環境では自動的にインストールされます
+pymatgen>=2023.10.0
+openbabel-wheel>=3.1.1
 
 # データ処理
 numpy>=1.24.0
