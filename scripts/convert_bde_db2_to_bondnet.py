@@ -214,12 +214,15 @@ def create_reactions_file(molecules, output_path, successful_smiles=None):
             continue
 
         for bde_entry in bde_list:
+            # BonDNet expects 'energy' key for BDE value
+            # We use bde_enthalpy as the primary energy value
             reaction = {
                 'reactants': [smiles],
                 'products': [bde_entry['fragment1'], bde_entry['fragment2']],
+                'energy': bde_entry['bde_enthalpy'],  # BonDNet expects this key
                 'bond_index': bde_entry['bond_index'],
-                'bde_enthalpy': bde_entry['bde_enthalpy'],
-                'bde_gibbs': bde_entry['bde_gibbs'],
+                'bde_enthalpy': bde_entry['bde_enthalpy'],  # Keep for reference
+                'bde_gibbs': bde_entry['bde_gibbs'],  # Keep for reference
                 'reaction_type': 'bond_dissociation',
                 'homolytic': True
             }
