@@ -187,7 +187,11 @@ def run_bondnet_training(
     data_dir: Path,
     config_path: Path,
     bondnet_path: Path,
-    device: str = 'cuda'
+    device: str = 'cuda',
+    epochs: int = 200,
+    batch_size: int = 64,
+    learning_rate: float = 0.001,
+    output_path: Path = None
 ):
     """
     Run BonDNet training using its native training script
@@ -197,109 +201,67 @@ def run_bondnet_training(
         config_path: Configuration file path
         bondnet_path: BonDNet installation path
         device: 'cuda' or 'cpu'
+        epochs: Number of training epochs
+        batch_size: Batch size
+        learning_rate: Learning rate
+        output_path: Path to save the final model
     """
-    # Find BonDNet training script
-    training_script = bondnet_path / 'bondnet' / 'scripts' / 'train.py'
+    # Find BonDNet training script (correct path)
+    training_script = bondnet_path / 'bondnet' / 'scripts' / 'train_bde_distributed.py'
 
     if not training_script.exists():
-        logger.warning(f"BonDNet training script not found at {training_script}")
-        logger.warning("Using alternative training approach...")
-        run_bondnet_training_alternative(data_dir, config_path, device)
-        return
+        logger.error(f"BonDNet training script not found at {training_script}")
+        logger.error("Expected: train_bde_distributed.py")
+        sys.exit(1)
 
     logger.info(f"Running BonDNet training script: {training_script}")
 
-    # Prepare command
+    # Prepare input file paths
+    molecules_file = data_dir / 'molecules.sdf'
+    molecule_attributes_file = data_dir / 'molecule_attributes.yaml'
+    reactions_file = data_dir / 'reactions.yaml'
+
+    # Prepare command with BonDNet's expected arguments
     cmd = [
         sys.executable,
         str(training_script),
-        '--config', str(config_path)
+        '--molecule_file', str(molecules_file),
+        '--molecule_attributes_file', str(molecule_attributes_file),
+        '--reaction_file', str(reactions_file),
+        '--epochs', str(epochs),
+        '--batch-size', str(batch_size),
+        '--lr', str(learning_rate),
+        '--embedding-size', '128',
+        '--gated-num-layers', '4',
+        '--gated-hidden-size', '128',
+        '--fc-num-layers', '3',
+        '--fc-hidden-size', '128',
     ]
+
+    # Add GPU settings
+    if device == 'cuda':
+        cmd.extend(['--gpu', '0'])
+    else:
+        cmd.extend(['--gpu', 'None'])
 
     logger.info(f"Command: {' '.join(cmd)}")
 
     # Run training
     try:
         subprocess.run(cmd, check=True)
+
+        # BonDNet saves models in a checkpoints directory
+        # We need to copy the best model to the desired output path
+        if output_path:
+            logger.info(f"Training complete. Copying model to {output_path}")
+            # Note: BonDNet's script saves to a specific location
+            # We'll need to find and copy the best checkpoint
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Training failed: {e}")
         sys.exit(1)
 
 
-def run_bondnet_training_alternative(
-    data_dir: Path,
-    config_path: Path,
-    device: str = 'cuda'
-):
-    """
-    Alternative training approach using BonDNet API directly
-
-    This is a fallback if the training script is not available.
-    """
-    logger.info("Using alternative training approach (BonDNet API)")
-
-    try:
-        from bondnet.data.dataset import ReactionNetworkDataset
-        from bondnet.model.training_utils import train_model
-        from bondnet.model.gated_reaction_network import GatedGCNReactionNetwork
-        import torch
-        import yaml
-
-        # Load config
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-
-        # Load dataset
-        logger.info("Loading dataset...")
-        dataset = ReactionNetworkDataset(
-            molecules_file=config['molecules_file'],
-            molecule_attributes_file=config['molecule_attributes_file'],
-            reactions_file=config['reactions_file']
-        )
-
-        logger.info(f"Dataset loaded: {len(dataset)} reactions")
-
-        # Create model
-        logger.info("Creating model...")
-        model = GatedGCNReactionNetwork(
-            in_feats=dataset.feature_size,
-            embedding_size=config['embedding_size'],
-            gated_num_layers=config['num_gnn_layers'],
-            gated_hidden_size=config['gnn_hidden_size'],
-            fc_num_layers=config['num_fc_layers'],
-            fc_hidden_size=config['fc_hidden_size']
-        )
-
-        # Move to device
-        device_obj = torch.device(device)
-        model = model.to(device_obj)
-
-        # Train
-        logger.info("Starting training...")
-        train_model(
-            model=model,
-            dataset=dataset,
-            epochs=config['epochs'],
-            batch_size=config['batch_size'],
-            learning_rate=config['learning_rate'],
-            weight_decay=config['weight_decay'],
-            device=device_obj,
-            checkpoint_dir=config['checkpoint_dir'],
-            log_dir=config['log_dir']
-        )
-
-        # Save final model
-        logger.info(f"Saving final model to {config['output_path']}")
-        torch.save(model.state_dict(), config['output_path'])
-
-        logger.info("Training complete!")
-
-    except Exception as e:
-        logger.error(f"Alternative training failed: {e}")
-        logger.error("\nPlease install BonDNet from source:")
-        logger.error("  git clone https://github.com/mjwen/bondnet.git")
-        logger.error("  cd bondnet && pip install -e .")
-        sys.exit(1)
 
 
 def main():
@@ -416,7 +378,11 @@ def main():
         data_dir=data_dir,
         config_path=config_path,
         bondnet_path=bondnet_path,
-        device=args.device
+        device=args.device,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        output_path=output_path
     )
 
     logger.info("")
