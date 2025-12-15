@@ -121,7 +121,7 @@ RUN pip install --no-cache-dir torch-geometric
 RUN export FORCE_CUDA=1 && \
     export TORCH_CUDA_ARCH_LIST="9.0;12.0" && \
     export CUDA_HOME=/usr/local/cuda-12.8 && \
-    export MAX_JOBS=4 && \
+    export MAX_JOBS=1 && \
     echo "Building PyG extensions from source with CUDA support..." && \
     pip install --no-cache-dir --no-build-isolation torch-scatter && \
     pip install --no-cache-dir --no-build-isolation torch-sparse torch-cluster torch-spline-conv
@@ -135,9 +135,11 @@ RUN pip install --no-cache-dir ogb>=1.3.6
 # ===================================================
 # PyTorch Nightlyと互換性を持たせるため、ソースからビルド
 # sm_120 (RTX 5070 Ti) 対応のため、パッチを適用して手動ビルド
+# メモリ最適化のため、CXXFLAGSでGCCのメモリ使用量を制限するオプションを追加
 RUN export FORCE_CUDA=1 && \
     export TORCH_CUDA_ARCH_LIST="9.0;12.0" && \
     export CUDA_HOME=/usr/local/cuda-12.8 && \
+    export CXXFLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768" && \
     echo "Building DGL from source with CUDA support..." && \
     # 1. ソースコードを再帰的にクローン
     git clone --recursive https://github.com/dmlc/dgl.git /tmp/dgl_source && \
@@ -150,9 +152,10 @@ RUN export FORCE_CUDA=1 && \
     # 3. C++ライブラリのビルド
     mkdir build && cd build && \
     # Releaseビルドを指定し、CUDA_ARCH_BIN="12.0" (sm_120) のみをターゲットにする
-    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_CUDA=ON -DUSE_OPENMP=ON -DCUDA_ARCH_NAME=Manual -DCUDA_ARCH_BIN="12.0" .. && \
-    # 【重要】メモリ不足回避のため、並列数を4に制限 (32GB RAM推奨値)
-    make -j4 && \
+    # GraphBoltはメモリ消費が激しいため無効化 (-DUSE_GRAPHBOLT=OFF)
+    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_CUDA=ON -DUSE_OPENMP=ON -DUSE_GRAPHBOLT=OFF -DCUDA_ARCH_NAME=Manual -DCUDA_ARCH_BIN="12.0" .. && \
+    # 【重要】メモリ不足回避のため、並列数を1に制限
+    make -j1 && \
     # 4. Pythonバインディングのインストール
     cd ../python && \
     pip install . && \
