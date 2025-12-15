@@ -34,6 +34,8 @@ RUN apt-get update && \
     libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev \
     # 化学計算用依存関係
     libopenblas-dev liblapack-dev libhdf5-dev \
+    # X11レンダリングライブラリ (RDKit Draw & OpenBabel に必要)
+    libxrender1 libxext6 libsm6 libice6 libx11-6 \
     # Git LFS (BDE-db2ダウンロードに必要)
     git-lfs \
     && rm -rf /var/lib/apt/lists/*
@@ -158,6 +160,14 @@ RUN export FORCE_CUDA=1 && \
     pip install . && \
     # 5. クリーンアップ
     cd / && rm -rf /tmp/dgl_source
+
+# ===================================================
+# BonDNet の依存関係
+# pymatgen と openbabel-wheel を先にインストール
+# ===================================================
+RUN pip install --no-cache-dir \
+    pymatgen>=2023.10.0 \
+    openbabel-wheel>=3.1.1
 
 # ===================================================
 # BonDNet インストール
