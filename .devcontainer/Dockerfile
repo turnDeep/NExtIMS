@@ -121,7 +121,7 @@ RUN pip install --no-cache-dir torch-geometric
 RUN export FORCE_CUDA=1 && \
     export TORCH_CUDA_ARCH_LIST="9.0;12.0" && \
     export CUDA_HOME=/usr/local/cuda-12.8 && \
-    export MAX_JOBS=4 && \
+    export MAX_JOBS=2 && \
     echo "Building PyG extensions from source with CUDA support..." && \
     pip install --no-cache-dir --no-build-isolation torch-scatter && \
     pip install --no-cache-dir --no-build-isolation torch-sparse torch-cluster torch-spline-conv
@@ -151,8 +151,8 @@ RUN export FORCE_CUDA=1 && \
     mkdir build && cd build && \
     # Releaseビルドを指定し、CUDA_ARCH_BIN="12.0" (sm_120) のみをターゲットにする
     cmake -DCMAKE_BUILD_TYPE=Release -DUSE_CUDA=ON -DUSE_OPENMP=ON -DCUDA_ARCH_NAME=Manual -DCUDA_ARCH_BIN="12.0" .. && \
-    # 【重要】メモリ不足回避のため、並列数を4に制限 (32GB RAM推奨値)
-    make -j4 && \
+    # 【重要】メモリ不足回避のため、並列数を2に制限 (24GB RAM環境向け)
+    make -j2 && \
     # 4. Pythonバインディングのインストール
     cd ../python && \
     pip install . && \
