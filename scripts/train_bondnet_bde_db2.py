@@ -274,7 +274,16 @@ def run_bondnet_training(
             sys.exit(1)
 
         logger.info(f"Transfer learning: Loading pretrained model from {pretrained_path}")
-        cmd.extend(['--restore', str(pretrained_path)])  # BonDNet uses --restore for pretrained models
+
+        # BonDNet's --restore expects an integer flag and loads from "checkpoint.pkl"
+        # Copy pretrained model to checkpoint.pkl in current directory
+        import shutil
+        checkpoint_path = Path('checkpoint.pkl')
+        shutil.copy2(pretrained_path, checkpoint_path)
+        logger.info(f"Copied pretrained model to: {checkpoint_path}")
+
+        # Use --restore 1 to load the checkpoint
+        cmd.extend(['--restore', '1'])
 
     logger.info(f"Command: {' '.join(cmd)}")
 
