@@ -156,6 +156,27 @@ def clone_pretrained_branch(output_dir: Path):
 
     repo_dir = output_dir / "bondnet_pretrained_repo"
 
+    # Check if repository already exists
+    if repo_dir.exists():
+        logger.info(f"Repository already exists at: {repo_dir}")
+        logger.info("Skipping clone and using existing repository")
+
+        # Look for checkpoint.pkl files in the existing repository
+        pretrained_dir = repo_dir / 'bondnet' / 'prediction' / 'pretrained'
+
+        if pretrained_dir.exists():
+            checkpoint_files = list(pretrained_dir.glob('**/checkpoint.pkl'))
+            if checkpoint_files:
+                logger.info(f"Found {len(checkpoint_files)} checkpoint file(s) in existing repo:")
+                for cf in checkpoint_files:
+                    logger.info(f"  - {cf.relative_to(repo_dir)}")
+                return repo_dir
+
+        logger.warning("Existing repository does not contain checkpoint files")
+        logger.info("Removing existing directory and re-cloning...")
+        import shutil
+        shutil.rmtree(repo_dir)
+
     try:
         # Clone with specific branch
         cmd = [
