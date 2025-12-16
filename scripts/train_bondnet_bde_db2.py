@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: BonDNet Retraining on BDE-db2
+NExtIMS v4.2: BonDNet Retraining on BDE-db2 with Transfer Learning
 
 Retrains BonDNet on the BDE-db2 dataset (531,244 BDEs from 65,540 molecules)
 to improve BDE prediction coverage and accuracy for NIST17 EI-MS dataset.
 
+Supports two training modes:
+    1. Transfer Learning (RECOMMENDED): Fine-tune from pretrained BDNCM model
+       - Training time: ~8 hours (50-100 epochs)
+       - Better generalization, faster convergence
+    2. From Scratch: Train from random initialization
+       - Training time: ~2-3 days (200 epochs)
+       - Full control over all parameters
+
 Why retrain BonDNet?
-    - Original BonDNet: Trained on 64,000 molecules
-    - BDE-db2: 531,244 BDEs (8x larger dataset)
+    - Original BonDNet: Trained on 64,000 molecules (C, H, O, N only)
+    - BDE-db2: 531,244 BDEs (includes halogens: Cl, F, Br, I + S, P)
     - NIST17 coverage: 95% → 99%+ (halogen-containing compounds)
     - Expected MAE: ~0.51 kcal/mol (similar or better)
 
-Workflow:
+Workflow (Transfer Learning - Recommended):
     1. Download BDE-db2 dataset:
        python scripts/download_bde_db2.py --output data/external/bde-db2
 
@@ -20,20 +28,31 @@ Workflow:
            --input data/external/bde-db2/bde-db2.csv \\
            --output data/processed/bondnet_training/
 
-    3. Retrain BonDNet (this script):
+    3. Download pretrained BonDNet weights:
+       python scripts/download_bondnet_pretrained.py \\
+           --output models/bondnet_pretrained.pth
+
+    4. Fine-tune BonDNet (this script):
        python scripts/train_bondnet_bde_db2.py \\
            --data-dir data/processed/bondnet_training/ \\
-           --output models/bondnet_bde_db2.pth
+           --pretrained models/bondnet_pretrained.pth \\
+           --output models/bondnet_bde_db2_finetuned.pth \\
+           --epochs 50 \\
+           --lr 0.0001
 
-    4. Pre-compute BDE with custom model:
+    5. Pre-compute BDE with fine-tuned model:
        python scripts/precompute_bde.py \\
            --nist-msp data/NIST17.MSP \\
-           --model models/bondnet_bde_db2.pth \\
+           --model models/bondnet_bde_db2_finetuned.pth \\
            --output data/processed/bde_cache/nist17_bde_cache.h5
+
+Workflow (From Scratch):
+    Same as above, but skip step 3 and omit --pretrained in step 4.
+    Use --epochs 200 --lr 0.001 for from-scratch training.
 
 Hardware Requirements:
     - GPU: RTX 5070 Ti 16GB (or similar)
-    - Training time: ~2-3 days (with optimizations)
+    - Training time: ~8 hours (transfer learning) or ~2-3 days (from scratch)
     - Disk: ~10 GB (dataset + model checkpoints)
 
 Requirements:
@@ -191,7 +210,8 @@ def run_bondnet_training(
     epochs: int = 200,
     batch_size: int = 64,
     learning_rate: float = 0.001,
-    output_path: Path = None
+    output_path: Path = None,
+    pretrained_path: Path = None
 ):
     """
     Run BonDNet training using its native training script
@@ -205,6 +225,7 @@ def run_bondnet_training(
         batch_size: Batch size
         learning_rate: Learning rate
         output_path: Path to save the final model
+        pretrained_path: Path to pretrained model for transfer learning (optional)
     """
     # Find BonDNet training script (correct path)
     training_script = bondnet_path / 'bondnet' / 'scripts' / 'train_bde_distributed.py'
@@ -243,6 +264,17 @@ def run_bondnet_training(
         cmd.extend(['--gpu', '0'])
     else:
         cmd.extend(['--gpu', 'None'])
+
+    # Add pretrained model for transfer learning
+    if pretrained_path:
+        if not pretrained_path.exists():
+            logger.error(f"Pretrained model not found: {pretrained_path}")
+            logger.error("Please download it first:")
+            logger.error("  python scripts/download_bondnet_pretrained.py")
+            sys.exit(1)
+
+        logger.info(f"Transfer learning: Loading pretrained model from {pretrained_path}")
+        cmd.extend(['--restore', str(pretrained_path)])  # BonDNet uses --restore for pretrained models
 
     logger.info(f"Command: {' '.join(cmd)}")
 
@@ -305,10 +337,12 @@ def main():
         help='Device: cuda or cpu (default: cuda)'
     )
     parser.add_argument(
+        '--pretrained',
         '--resume',
         type=str,
         default=None,
-        help='Resume from checkpoint (optional)'
+        dest='resume',
+        help='Path to pretrained model for transfer learning (optional, recommended for faster training)'
     )
 
     args = parser.parse_args()
@@ -342,9 +376,22 @@ def main():
     logger.info(f"Output directory: {output_dir}")
     logger.info(f"Model will be saved to: {output_path}")
 
+    # Check for pretrained model (transfer learning)
+    pretrained_path = None
+    if args.resume:
+        pretrained_path = Path(args.resume)
+        if not pretrained_path.exists():
+            logger.error(f"Pretrained model not found: {pretrained_path}")
+            logger.error("Download it first:")
+            logger.error("  python scripts/download_bondnet_pretrained.py \\")
+            logger.error(f"      --output {pretrained_path}")
+            sys.exit(1)
+        logger.info(f"Transfer learning: Using pretrained model from {pretrained_path}")
+
     # Training parameters
     logger.info("")
     logger.info("Training parameters:")
+    logger.info(f"  Mode: {'Transfer Learning (Fine-tuning)' if pretrained_path else 'From Scratch'}")
     logger.info(f"  Epochs: {args.epochs}")
     logger.info(f"  Batch size: {args.batch_size}")
     logger.info(f"  Learning rate: {args.learning_rate}")
@@ -352,7 +399,10 @@ def main():
 
     # Estimate training time
     if args.device == 'cuda':
-        estimated_time_hours = 48  # ~2 days for RTX 5070 Ti
+        if pretrained_path:
+            estimated_time_hours = 8  # ~8 hours for transfer learning (50-100 epochs)
+        else:
+            estimated_time_hours = 48  # ~2 days for from-scratch training (200 epochs)
         logger.info(f"  Estimated time: ~{estimated_time_hours} hours (~{estimated_time_hours/24:.1f} days)")
     else:
         logger.warning("  CPU training will be very slow (not recommended)")
@@ -382,7 +432,8 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        output_path=output_path
+        output_path=output_path,
+        pretrained_path=pretrained_path
     )
 
     logger.info("")
