@@ -38,7 +38,7 @@ Workflow (Transfer Learning - Recommended):
            --pretrained models/bondnet_pretrained.pth \\
            --output models/bondnet_bde_db2_finetuned.pth \\
            --epochs 50 \\
-           --batch-size 16 \\
+           --batch-size 64 \\
            --learning-rate 0.0001
 
     5. Pre-compute BDE with fine-tuned model:
@@ -53,10 +53,10 @@ Workflow (From Scratch):
 
 Hardware Requirements:
     - GPU: RTX 5070 Ti 16GB (or similar)
-    - RAM: 13GB minimum (batch_size=16), 32GB+ recommended (batch_size=32-64)
-    - Training time: ~10-12 hours (transfer learning, batch_size=16) or ~3-4 days (from scratch)
+    - RAM: 32GB+ recommended for full dataset (425K molecules requires HDF5 streaming for <64GB RAM)
+    - Training time: ~10-12 hours (transfer learning) or ~3-4 days (from scratch)
     - Disk: ~10 GB (dataset + model checkpoints)
-    - Note: No swap memory configured - training may fail with OOM if RAM < 13GB
+    - Note: For large datasets use HDF5 streaming loader (see scripts/bondnet_hdf5_dataset.py)
 
 Requirements:
     - BonDNet: pip install git+https://github.com/mjwen/bondnet.git
@@ -148,7 +148,7 @@ def create_training_config(
         data_dir: Directory containing training data
         output_dir: Directory for model checkpoints
         epochs: Number of training epochs
-        batch_size: Batch size (16 for large datasets with 13GB RAM, 32-64 for 32GB+ RAM)
+        batch_size: Batch size
         learning_rate: Learning rate
         device: 'cuda' or 'cpu'
 
@@ -333,8 +333,8 @@ def main():
     parser.add_argument(
         '--batch-size',
         type=int,
-        default=16,
-        help='Batch size (default: 16, optimized for large datasets with limited RAM)'
+        default=64,
+        help='Batch size (default: 64)'
     )
     parser.add_argument(
         '--learning-rate',
