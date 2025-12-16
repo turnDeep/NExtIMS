@@ -30,6 +30,7 @@ ENV/
 *.pt
 *.pth
 *.ckpt
+*.pkl
 !checkpoints/.gitkeep
 
 # Data files (keep structure but ignore large files)
@@ -41,6 +42,11 @@ data/processed/*.h5
 data/processed/*.hdf5
 data/external/
 data/processed/bondnet_training/
+
+# Model files and repos
+models/*_repo/
+models/*.pkl
+models/*.pth
 
 # Jupyter Notebook
 .ipynb_checkpoints

@@ -122,13 +122,23 @@ def download_from_zenodo(output_path: Path):
             logger.info(f"  - {f['key']}")
         return False
 
-    # Download the first model file (or the one that matches 'bondnet' or 'model')
+    # Download the model file - prefer checkpoint.pkl or files with 'checkpoint', 'bondnet', or 'model' in name
     target_file = None
+
+    # First priority: checkpoint.pkl
     for f in model_files:
-        if 'bondnet' in f['key'].lower() or 'model' in f['key'].lower():
+        if 'checkpoint' in f['key'].lower():
             target_file = f
             break
 
+    # Second priority: bondnet or model in filename
+    if not target_file:
+        for f in model_files:
+            if 'bondnet' in f['key'].lower() or 'model' in f['key'].lower():
+                target_file = f
+                break
+
+    # Fallback: first model file
     if not target_file:
         target_file = model_files[0]
 
@@ -159,16 +169,32 @@ def clone_pretrained_branch(output_dir: Path):
         subprocess.run(cmd, check=True, capture_output=True)
         logger.info(f"✓ Cloned pretrained branch to: {repo_dir}")
 
-        # Look for model files in the cloned repository
-        model_files = list(repo_dir.glob('**/*.pth')) + list(repo_dir.glob('**/*.pt'))
+        # Look for checkpoint.pkl files in the pretrained directory
+        # BonDNet uses .pkl format, not .pth/.pt
+        pretrained_dir = repo_dir / 'bondnet' / 'prediction' / 'pretrained'
 
-        if model_files:
-            logger.info(f"Found {len(model_files)} model file(s):")
-            for mf in model_files:
-                logger.info(f"  - {mf.relative_to(repo_dir)}")
+        if not pretrained_dir.exists():
+            logger.warning(f"Pretrained directory not found: {pretrained_dir}")
+            return repo_dir
+
+        # Search for checkpoint.pkl files
+        checkpoint_files = list(pretrained_dir.glob('**/checkpoint.pkl'))
+
+        if checkpoint_files:
+            logger.info(f"Found {len(checkpoint_files)} checkpoint file(s):")
+            for cf in checkpoint_files:
+                logger.info(f"  - {cf.relative_to(repo_dir)}")
             return repo_dir
         else:
-            logger.warning("No .pth or .pt files found in pretrained branch")
+            logger.warning("No checkpoint.pkl files found in pretrained branch")
+            # Fall back to searching for any .pkl, .pth, .pt files
+            model_files = (list(repo_dir.glob('**/*.pkl')) +
+                          list(repo_dir.glob('**/*.pth')) +
+                          list(repo_dir.glob('**/*.pt')))
+            if model_files:
+                logger.info(f"Found {len(model_files)} model file(s):")
+                for mf in model_files[:5]:  # Show first 5
+                    logger.info(f"  - {mf.relative_to(repo_dir)}")
             return repo_dir
 
     except subprocess.CalledProcessError as e:
@@ -290,19 +316,35 @@ def main():
         repo_dir = clone_pretrained_branch(output_path.parent)
 
         if repo_dir:
-            # Look for model files
-            model_files = list(repo_dir.glob('**/*.pth')) + list(repo_dir.glob('**/*.pt'))
+            # Look for checkpoint.pkl files (BonDNet format)
+            # Prefer BDNCM model over PubChem model
+            bdncm_checkpoint = repo_dir / 'bondnet' / 'prediction' / 'pretrained' / 'bdncm' / '20200808' / 'checkpoint.pkl'
+            pubchem_checkpoint = repo_dir / 'bondnet' / 'prediction' / 'pretrained' / 'pubchem' / '20200810' / 'checkpoint.pkl'
 
-            if model_files:
-                # Copy the first model file to output path
+            checkpoint_to_use = None
+            if bdncm_checkpoint.exists():
+                checkpoint_to_use = bdncm_checkpoint
+                logger.info("Found BDNCM pretrained model (preferred for transfer learning)")
+            elif pubchem_checkpoint.exists():
+                checkpoint_to_use = pubchem_checkpoint
+                logger.info("Found PubChem pretrained model")
+            else:
+                # Fall back to searching for any checkpoint.pkl
+                checkpoint_files = list(repo_dir.glob('**/checkpoint.pkl'))
+                if checkpoint_files:
+                    checkpoint_to_use = checkpoint_files[0]
+                    logger.info(f"Found checkpoint at: {checkpoint_to_use.relative_to(repo_dir)}")
+
+            if checkpoint_to_use:
+                # Copy the checkpoint file to output path
                 import shutil
-                shutil.copy2(model_files[0], output_path)
-                logger.info(f"✓ Copied model from pretrained branch: {model_files[0].name}")
+                shutil.copy2(checkpoint_to_use, output_path)
+                logger.info(f"✓ Copied model: {checkpoint_to_use.relative_to(repo_dir)} -> {output_path.name}")
                 success = True
             else:
-                logger.warning("No model files found in pretrained branch")
+                logger.warning("No checkpoint.pkl files found in pretrained branch")
                 logger.info(f"Repository cloned to: {repo_dir}")
-                logger.info("You may need to manually locate the model file")
+                logger.info("You may need to manually locate the checkpoint file")
 
     # Create README
     if success:
