@@ -522,6 +522,25 @@ class BonDNetHDF5Dataset(Dataset):
         reactant_graph = self._get_graph(reactant_id, reactant_smiles)
         product_graphs = [self._get_graph(pid, psmiles) for pid, psmiles in zip(product_id_list, product_smiles_list)]
 
+        # Validate mappings
+        # Check atom mapping consistency
+        # If atom_mapping is empty but there are atoms in reactant, it is invalid.
+        num_atoms = reactant_graph.num_nodes('atom')
+        if not atom_mapping and num_atoms > 0:
+            logger.warning(f"Skipping reaction {idx}: Atoms present ({num_atoms}) but no atom_mapping.")
+            return None
+
+        # Check bond mapping consistency
+        # If bond_mapping is empty, it might be valid (no bonds) or invalid (missing map).
+        num_bonds = reactant_graph.num_nodes('bond')
+        if not bond_mapping:
+            if num_bonds > 0:
+                logger.warning(f"Skipping reaction {idx}: Bonds present ({num_bonds}) but no bond_mapping.")
+                return None
+            else:
+                # Valid case (no bonds), apply fix to prevent ValueError in bondnet
+                bond_mapping = [{}]
+
         return {
             'reactant_graph': reactant_graph,
             'product_graphs': product_graphs,
@@ -546,6 +565,11 @@ def collate_bondnet(batch: List[Dict]) -> Tuple[dgl.DGLGraph, Dict]:
     Collate function for BonDNet DataLoader.
     Constructs a batched graph and a list of Reaction objects.
     """
+    # Filter out None samples (skipped due to invalid data)
+    batch = [b for b in batch if b is not None]
+    if not batch:
+        return None, None
+
     all_graphs = []
     reactions = []
     energies = []
