@@ -384,14 +384,8 @@ class BonDNetHDF5Dataset(Dataset):
         # bond_featurizer(mol) returns a dict with 'feat' key.
         bond_feats_dict = bond_featurizer(mol)
 
-        # Edge list
-        edges_src = []
-        edges_dst = []
-
-        # BondNet featurizer returns features in order of mol.GetBonds()
-        # So we can just use the returned tensor directly for 'bond' nodes
-
-        # Construct connectivity
+        # Edge list logic for DGL HeteroGraph
+        # We need to construct edges for a2b, b2a, etc.
         a2b_src = []
         a2b_dst = []
         b2a_src = []
@@ -401,167 +395,66 @@ class BonDNetHDF5Dataset(Dataset):
             u = bond.GetBeginAtomIdx()
             v = bond.GetEndAtomIdx()
 
+            # Atom to Bond
             a2b_src.extend([u, v])
             a2b_dst.extend([b_idx, b_idx])
 
+            # Bond to Atom
             b2a_src.extend([b_idx, b_idx])
             b2a_dst.extend([u, v])
 
-            # Record edges for a2a (simple connectivity)
-            edges_src.extend([u, v])
-            edges_dst.extend([v, u])
+        # a2a (Atom to Atom) - simple connectivity u->v and v->u
+        a2a_src = []
+        a2a_dst = []
+        for bond in mol.GetBonds():
+            u = bond.GetBeginAtomIdx()
+            v = bond.GetEndAtomIdx()
+            a2a_src.extend([u, v])
+            a2a_dst.extend([v, u])
 
-        # Create DGL graph
-        # But GatedGCNReactionNetwork usually expects a heterograph or specific node types.
-        # Based on error 'Expect ntype in ['_N'], got atom', our current graph is homogeneous (ntype '_N').
-        # We should create a heterograph with 'atom' nodes (and maybe 'bond' nodes if we use line graph)
-        # OR just rename the node type.
-
-        # Creating a heterograph with explicit node types 'atom' and 'bond' is complex if the model
-        # expects a specific structure (like line graph connections).
-        # However, checking BonDNet code:
-        # It typically uses dgl.heterograph({('atom', 'bond', 'atom'): (u, v)})
-
-        # For simplicity in this HDF5 loader, let's create a heterograph mimicking what's expected.
-        # But wait, BonDNet grapher produces a graph where 'atom' is a node type.
-
+        # Construct data dict for HeteroGraph
+        # Ensure tensor types are explicitly correct
         data_dict = {
-            ('atom', 'a2b', 'atom'): (torch.tensor(edges_src, dtype=torch.long), torch.tensor(edges_dst, dtype=torch.long))
-        }
+            ('atom', 'a2b', 'bond'): (torch.tensor(a2b_src, dtype=torch.long), torch.tensor(a2b_dst, dtype=torch.long)),
+            ('bond', 'b2a', 'atom'): (torch.tensor(b2a_src, dtype=torch.long), torch.tensor(b2a_dst, dtype=torch.long)),
+            # Adding b2b (bond to bond) to satisfy GatedGCN expectations if it checks for it
+            ('bond', 'b2b', 'bond'): (torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)),
 
-        # If no edges, we still need the node type 'atom'
-        if len(edges_src) == 0:
-            # DGL heterograph with no edges but specified num_nodes
-            # Note: BondNet seems to expect 'bond' nodes as well (likely line graph nodes or explicit bond nodes)
-            # If the model errors with 'Node type "bond" does not exist', we must add it.
-            # Even if we have 0 bonds, the type must exist.
-            g = dgl.heterograph(data_dict, num_nodes_dict={'atom': num_atoms, 'bond': 0})
-        else:
-            # We assume 'bond' nodes correspond to edges? Or does BondNet construct a line graph?
-            # Looking at BondNet `grapher.py`, it uses `BondAsNodeFeaturizerFull`.
-            # This implies bonds are treated as nodes in the graph structure.
-            # The edge list I constructed was atom-to-atom ('a2b' relation implies atom-to-bond?).
+            # Adding g2b (global to bond) and b2g (bond to global) as per GatedGCNConv expectation
+            ('global', 'g2b', 'bond'): (torch.zeros(num_bonds, dtype=torch.long), torch.arange(num_bonds, dtype=torch.long)),
+            ('bond', 'b2g', 'global'): (torch.arange(num_bonds, dtype=torch.long), torch.zeros(num_bonds, dtype=torch.long)),
 
-            # The previous 'a2b' relation I guessed might be wrong if 'bond' is a node type.
-            # If 'bond' is a node type, then 'a2b' probably connects atoms to bond nodes.
-
-            # Let's adjust to create 'bond' nodes.
-            # Each bond in molecule (edge in my construction) becomes a node of type 'bond'.
-            # My edge list `edges_src`, `edges_dst` represents atom connectivity.
-            # If we follow BondNet convention:
-            # Nodes: 'atom', 'bond'
-            # Edges: 'a2b' (atom to bond), 'b2a' (bond to atom), 'b2b' (bond to bond, optional)
-
-            # In my simplified HDF5 loader, I don't have the full logic to build this complex graph.
-            # However, I can try to mimic it simply.
-            # Every undirected bond becomes 1 'bond' node? Or 2 directed?
-            # RDKit gives bonds.
-
-            num_bonds = mol.GetNumBonds()
-
-            # Reset data dict for correct structure
-            # We need to map which atom connects to which bond node.
-
-            a2b_src = []
-            a2b_dst = []
-            b2a_src = []
-            b2a_dst = []
-
-            bond_feats_reordered = []
-
-            for b_idx, bond in enumerate(mol.GetBonds()):
-                u = bond.GetBeginAtomIdx()
-                v = bond.GetEndAtomIdx()
-
-                # Bond node index = b_idx
-                # Connect u -> b_idx and v -> b_idx (for a2b)
-                # Connect b_idx -> u and b_idx -> v (for b2a)
-
-                a2b_src.extend([u, v])
-                a2b_dst.extend([b_idx, b_idx])
-
-                b2a_src.extend([b_idx, b_idx])
-                b2a_dst.extend([u, v])
-
-                # Features for this bond node
-                features = [
-                    float(bond.GetBondTypeAsDouble()),
-                    float(bond.GetIsConjugated()),
-                    float(bond.GetIsAromatic()),
-                    float(bond.IsInRing()),
-                ]
-                bond_feats_reordered.append(features)
-
-            data_dict = {
-                ('atom', 'a2b', 'bond'): (torch.tensor(a2b_src, dtype=torch.long), torch.tensor(a2b_dst, dtype=torch.long)),
-                ('bond', 'b2a', 'atom'): (torch.tensor(b2a_src, dtype=torch.long), torch.tensor(b2a_dst, dtype=torch.long)),
-                # Adding b2b (bond to bond) to satisfy GatedGCN expectations if it checks for it
-                # Even if empty.
-                ('bond', 'b2b', 'bond'): (torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)),
-
-                # Adding g2b (global to bond) and b2g (bond to global) as per GatedGCNConv expectation
-                # 'global' node is usually connected to all bonds in BonDNet
-                # We have 1 global node (idx 0). We need to connect it to all bond nodes.
-                ('global', 'g2b', 'bond'): (torch.zeros(num_bonds, dtype=torch.long), torch.arange(num_bonds, dtype=torch.long)),
-                ('bond', 'b2g', 'global'): (torch.arange(num_bonds, dtype=torch.long), torch.zeros(num_bonds, dtype=torch.long)),
-
-                # Adding a2a (atom to atom) - probably based on original bonds?
-                # GatedGCN might use direct atom-atom connections too.
-                # In standard graph, a2a would be the bonds.
-                # Let's add them.
-                ('atom', 'a2a', 'atom'): (torch.tensor(a2b_src, dtype=torch.long), torch.tensor(a2b_src, dtype=torch.long)) # Wait, src/dst logic for a2a needs to be correct.
-                # Use original edges for a2a
-            }
-
-            # Resetting a2a to use proper edges from mol
-            # We already have a2b_src/dst which came from u,v
-            # a2a should be u->v and v->u
-
-            # Since I already flattened a2b_src to include both directions in previous loop (I think? No, I did)
-            # In the loop:
-            # a2b_src.extend([u, v])
-            # a2b_dst.extend([b_idx, b_idx])
-            # So a2b_src has [u1, v1, u2, v2...]
-
-            # For a2a, we want u->v and v->u.
-            # a2a_src = [u, v]
-            # a2a_dst = [v, u]
-
-            a2a_src = []
-            a2a_dst = []
-
-            for bond in mol.GetBonds():
-                u = bond.GetBeginAtomIdx()
-                v = bond.GetEndAtomIdx()
-                a2a_src.extend([u, v])
-                a2a_dst.extend([v, u])
-
-            data_dict[('atom', 'a2a', 'atom')] = (torch.tensor(a2a_src, dtype=torch.long), torch.tensor(a2a_dst, dtype=torch.long))
+            # Adding a2a (atom to atom)
+            ('atom', 'a2a', 'atom'): (torch.tensor(a2a_src, dtype=torch.long), torch.tensor(a2a_dst, dtype=torch.long)),
 
             # Adding g2a (global to atom) and a2g (atom to global)
-            data_dict[('global', 'g2a', 'atom')] = (torch.zeros(num_atoms, dtype=torch.long), torch.arange(num_atoms, dtype=torch.long))
-            data_dict[('atom', 'a2g', 'global')] = (torch.arange(num_atoms, dtype=torch.long), torch.zeros(num_atoms, dtype=torch.long))
+            ('global', 'g2a', 'atom'): (torch.zeros(num_atoms, dtype=torch.long), torch.arange(num_atoms, dtype=torch.long)),
+            ('atom', 'a2g', 'global'): (torch.arange(num_atoms, dtype=torch.long), torch.zeros(num_atoms, dtype=torch.long)),
 
             # Adding g2g (global to global) self-loop
-            data_dict[('global', 'g2g', 'global')] = (torch.zeros(1, dtype=torch.long), torch.zeros(1, dtype=torch.long))
+            ('global', 'g2g', 'global'): (torch.zeros(1, dtype=torch.long), torch.zeros(1, dtype=torch.long))
+        }
 
-            g = dgl.heterograph(data_dict, num_nodes_dict={'atom': num_atoms, 'bond': num_bonds, 'global': 1})
+        # Force num_nodes_dict to contain all types
+        g = dgl.heterograph(data_dict, num_nodes_dict={'atom': num_atoms, 'bond': num_bonds, 'global': 1})
 
-            if num_bonds > 0:
-                g.nodes['bond'].data['feat'] = bond_feats_dict['feat']
-            else:
-                # Empty bond features with correct shape (last dim)
-                # If 0 bonds, we still need correct shape for model.
-                # Create a dummy molecule to get shape
-                dummy_mol = Chem.MolFromSmiles('CC')
-                dummy_mol = Chem.AddHs(dummy_mol)
-                dummy_feats = bond_featurizer(dummy_mol)['feat']
-                feat_dim = dummy_feats.shape[1]
-                g.nodes['bond'].data['feat'] = torch.zeros((0, feat_dim), dtype=torch.float32)
+        if num_bonds > 0:
+            g.nodes['bond'].data['feat'] = bond_feats_dict['feat']
+        else:
+            # Empty bond features with correct shape (last dim)
+            dummy_mol = Chem.MolFromSmiles('CC')
+            dummy_mol = Chem.AddHs(dummy_mol)
+            dummy_feats = bond_featurizer(dummy_mol)['feat']
+            feat_dim = dummy_feats.shape[1]
+            g.nodes['bond'].data['feat'] = torch.zeros((0, feat_dim), dtype=torch.float32)
 
         g.nodes['atom'].data['feat'] = node_features
         # Global node feature (empty/zero)
-        g.nodes['global'].data['feat'] = torch.zeros((1, 0), dtype=torch.float32)
+        # Verify node type exists before setting (though it should)
+        if 'global' in g.ntypes:
+            g.nodes['global'].data['feat'] = torch.zeros((1, 0), dtype=torch.float32)
+        else:
+            logger.warning("Global node type missing in constructed graph!")
 
         return g
 
