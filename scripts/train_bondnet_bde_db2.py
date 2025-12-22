@@ -57,7 +57,11 @@ def train_one_epoch(model, dataloader, optimizer, loss_fn, device, metric_fn):
     # We need to construct the features dict from the batched graph
     nodes = ["atom", "bond", "global"]
 
-    for i, (bg, labels) in enumerate(dataloader):
+    for i, batch_data in enumerate(dataloader):
+        if batch_data[0] is None:
+             continue
+        bg, labels = batch_data
+
         bg = bg.to(device)
         target = labels['value'].to(device)
         reactions = labels['reaction'] # List of Reaction objects
@@ -136,7 +140,11 @@ def validate(model, dataloader, device, metric_fn):
     nodes = ["atom", "bond", "global"]
 
     with torch.no_grad():
-        for i, (bg, labels) in enumerate(dataloader):
+        for i, batch_data in enumerate(dataloader):
+            if batch_data[0] is None:
+                 continue
+            bg, labels = batch_data
+
             bg = bg.to(device)
             target = labels['value'].to(device)
             reactions = labels['reaction']
