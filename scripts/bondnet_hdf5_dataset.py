@@ -35,15 +35,20 @@ from tqdm import tqdm
 import dgl
 from dgl import DGLGraph
 
-# Attempt to import BondNet classes for typing/construction if available
+# Attempt to import BondNet classes
 try:
     # Try importing ReactionInNetwork as Reaction (aliasing it as it seems to be the class name in installed version)
     from bondnet.data.reaction_network import ReactionInNetwork as Reaction
+    from bondnet.data.featurizer import AtomFeaturizerFull, BondAsNodeFeaturizerFull, GlobalFeaturizer
 except ImportError:
     try:
         from bondnet.data.reaction_network import Reaction
+        from bondnet.data.featurizer import AtomFeaturizerFull, BondAsNodeFeaturizerFull, GlobalFeaturizer
     except ImportError:
         Reaction = None
+        AtomFeaturizerFull = None
+        BondAsNodeFeaturizerFull = None
+        GlobalFeaturizer = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -68,107 +73,185 @@ def create_hdf5_dataset(
     logger.info("Converting BonDNet data to HDF5 format")
     logger.info("="*80)
 
-    # Load molecules from SDF
-    logger.info(f"Loading molecules from: {molecule_file}")
-    suppl = Chem.SDMolSupplier(molecule_file, removeHs=False, sanitize=False)
-
-    molecules_smiles = []
-    molecules_ids = []
-
-    for idx, mol in enumerate(tqdm(suppl, desc="Reading molecules")):
-        if mol is None:
-            logger.warning(f"Failed to parse molecule at index {idx}")
-            molecules_smiles.append("")  # Placeholder
-            molecules_ids.append(f"mol_{idx}")
-        else:
-            smiles = Chem.MolToSmiles(mol)
-            mol_id = mol.GetProp('_Name') if mol.HasProp('_Name') else f"mol_{idx}"
-            molecules_smiles.append(smiles)
-            molecules_ids.append(mol_id)
-
-    logger.info(f"Loaded {len(molecules_smiles)} molecules")
-
-    # Load molecule attributes
-    logger.info(f"Loading molecule attributes from: {molecule_attributes_file}")
-    with open(molecule_attributes_file, 'r') as f:
-        molecule_attributes = yaml.safe_load(f)
-
-    # Load reactions
-    logger.info(f"Loading reactions from: {reaction_file}")
-    with open(reaction_file, 'r') as f:
-        reactions = yaml.safe_load(f)
-
-    logger.info(f"Loaded {len(reactions)} reactions")
-
     # Create HDF5 file
     logger.info(f"Creating HDF5 file: {output_h5}")
     Path(output_h5).parent.mkdir(parents=True, exist_ok=True)
 
-    with h5py.File(output_h5, 'w') as f:
-        # Store molecules (SMILES only, graphs generated on-the-fly)
-        logger.info("Storing molecules...")
-        dt = h5py.string_dtype(encoding='utf-8')
-        f.create_dataset('molecule_smiles', data=molecules_smiles, dtype=dt)
-        f.create_dataset('molecule_ids', data=molecules_ids, dtype=dt)
+    CHUNK_SIZE = 10000
 
-        # Store molecule attributes (if any)
+    with h5py.File(output_h5, 'w') as f:
+        dt_str = h5py.string_dtype(encoding='utf-8')
+
+        # --- Molecules ---
+        logger.info(f"Loading molecules from: {molecule_file}")
+        suppl = Chem.SDMolSupplier(molecule_file, removeHs=False, sanitize=False)
+
+        # Initialize datasets for molecules (resizeable)
+        dset_mol_smiles = f.create_dataset('molecule_smiles', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_mol_ids = f.create_dataset('molecule_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+
+        buffer_smiles = []
+        buffer_ids = []
+        total_molecules = 0
+
+        for idx, mol in enumerate(tqdm(suppl, desc="Reading molecules")):
+            if mol is None:
+                logger.warning(f"Failed to parse molecule at index {idx}")
+                buffer_smiles.append("")
+                buffer_ids.append(f"mol_{idx}")
+            else:
+                smiles = Chem.MolToSmiles(mol)
+                mol_id = mol.GetProp('_Name') if mol.HasProp('_Name') else f"mol_{idx}"
+                buffer_smiles.append(smiles)
+                buffer_ids.append(mol_id)
+
+            if len(buffer_smiles) >= CHUNK_SIZE:
+                # Write chunk
+                new_len = total_molecules + len(buffer_smiles)
+                dset_mol_smiles.resize((new_len,))
+                dset_mol_ids.resize((new_len,))
+                dset_mol_smiles[total_molecules:new_len] = buffer_smiles
+                dset_mol_ids[total_molecules:new_len] = buffer_ids
+
+                total_molecules = new_len
+                buffer_smiles = []
+                buffer_ids = []
+
+        # Write remaining molecules
+        if buffer_smiles:
+            new_len = total_molecules + len(buffer_smiles)
+            dset_mol_smiles.resize((new_len,))
+            dset_mol_ids.resize((new_len,))
+            dset_mol_smiles[total_molecules:new_len] = buffer_smiles
+            dset_mol_ids[total_molecules:new_len] = buffer_ids
+            total_molecules = new_len
+
+        logger.info(f"Loaded {total_molecules} molecules")
+        f.attrs['num_molecules'] = total_molecules
+
+        # --- Molecule Attributes ---
+        # Note: Attributes file is typically small enough to load fully, but for consistency let's be careful.
+        # However, YAML loading loads everything at once anyway. If attributes file is huge, this is still a bottleneck.
+        # Assuming attributes file is manageable for now as it's typically metadata.
+        logger.info(f"Loading molecule attributes from: {molecule_attributes_file}")
+        with open(molecule_attributes_file, 'r') as attr_f:
+            molecule_attributes = yaml.safe_load(attr_f)
+
         if molecule_attributes:
             attrs_group = f.create_group('molecule_attributes')
             for key, values in molecule_attributes.items():
                 if isinstance(values, list):
                     attrs_group.create_dataset(key, data=np.array(values))
 
-        # Store reactions
-        logger.info("Storing reactions...")
+        # --- Reactions ---
+        logger.info(f"Loading reactions from: {reaction_file}")
+
+        # Initialize datasets for reactions
         reactions_group = f.create_group('reactions')
 
-        reaction_ids = []
-        reactant_ids = []
-        product_ids_json = []  # Store list of products as JSON string
-        atom_mapping_json = [] # Store list of dicts as JSON string
-        bond_mapping_json = [] # Store list of dicts as JSON string
-        bond_indices = []
-        energies = []
+        dset_rxn_ids = reactions_group.create_dataset('reaction_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_reactant_ids = reactions_group.create_dataset('reactant_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_product_ids = reactions_group.create_dataset('product_ids_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_atom_map = reactions_group.create_dataset('atom_mapping_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_bond_map = reactions_group.create_dataset('bond_mapping_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        dset_bond_idx = reactions_group.create_dataset('bond_indices', shape=(0,), maxshape=(None,), dtype=np.int32, chunks=(CHUNK_SIZE,))
+        dset_energies = reactions_group.create_dataset('energies', shape=(0,), maxshape=(None,), dtype=np.float32, chunks=(CHUNK_SIZE,))
 
-        for rxn_idx, rxn in enumerate(tqdm(reactions, desc="Processing reactions")):
-            reaction_ids.append(rxn.get('id', f'rxn_{rxn_idx}'))
-            reactant_ids.append(rxn['reactant'])
+        # YAML loading of a huge file is memory intensive.
+        # Standard yaml.safe_load loads the whole document.
+        # If reaction_file is huge, we should parse it iteratively if possible, or assume user has enough RAM for YAML load
+        # even if they don't have enough for the full object processing + HDF5 overhead.
+        # For now, we load YAML once (as in original) but process/write in chunks to avoid doubling memory usage.
 
-            # Products can be multiple, store as list
-            products = rxn.get('products', [])
-            product_ids_json.append(json.dumps(products))
+        with open(reaction_file, 'r') as rxn_f:
+            reactions = yaml.safe_load(rxn_f)
+            # If reactions is None (empty file), make it empty list
+            if reactions is None:
+                reactions = []
 
-            # Mappings
-            atom_map = rxn.get('atom_mapping', [])
-            bond_map = rxn.get('bond_mapping', [])
-            atom_mapping_json.append(json.dumps(atom_map))
-            bond_mapping_json.append(json.dumps(bond_map))
+        # Buffer for reactions
+        buf_rxn_ids = []
+        buf_reactant_ids = []
+        buf_product_ids = []
+        buf_atom_map = []
+        buf_bond_map = []
+        buf_bond_idx = []
+        buf_energies = []
 
-            # Bond index (which bond is broken)
-            bond_idx = rxn.get('bond_index', -1)
-            bond_indices.append(bond_idx)
+        total_reactions = 0
 
-            # Energy (BDE value)
-            energy = rxn.get('energy', 0.0)
-            energies.append(energy)
+        logger.info(f"Processing {len(reactions)} reactions...")
 
-        reactions_group.create_dataset('reaction_ids', data=reaction_ids, dtype=dt)
-        reactions_group.create_dataset('reactant_ids', data=reactant_ids, dtype=dt)
-        reactions_group.create_dataset('product_ids_json', data=product_ids_json, dtype=dt)
-        reactions_group.create_dataset('atom_mapping_json', data=atom_mapping_json, dtype=dt)
-        reactions_group.create_dataset('bond_mapping_json', data=bond_mapping_json, dtype=dt)
-        reactions_group.create_dataset('bond_indices', data=np.array(bond_indices, dtype=np.int32))
-        reactions_group.create_dataset('energies', data=np.array(energies, dtype=np.float32))
+        for rxn_idx, rxn in enumerate(tqdm(reactions, desc="Writing reactions")):
+            buf_rxn_ids.append(rxn.get('id', f'rxn_{rxn_idx}'))
+            buf_reactant_ids.append(rxn['reactant'])
+            buf_product_ids.append(json.dumps(rxn.get('products', [])))
+            buf_atom_map.append(json.dumps(rxn.get('atom_mapping', [])))
+            buf_bond_map.append(json.dumps(rxn.get('bond_mapping', [])))
+            buf_bond_idx.append(rxn.get('bond_index', -1))
+            buf_energies.append(rxn.get('energy', 0.0))
 
-        # Store metadata
-        f.attrs['num_molecules'] = len(molecules_smiles)
-        f.attrs['num_reactions'] = len(reactions)
+            if len(buf_rxn_ids) >= CHUNK_SIZE:
+                new_len = total_reactions + len(buf_rxn_ids)
+
+                # Resize
+                dset_rxn_ids.resize((new_len,))
+                dset_reactant_ids.resize((new_len,))
+                dset_product_ids.resize((new_len,))
+                dset_atom_map.resize((new_len,))
+                dset_bond_map.resize((new_len,))
+                dset_bond_idx.resize((new_len,))
+                dset_energies.resize((new_len,))
+
+                # Write
+                dset_rxn_ids[total_reactions:new_len] = buf_rxn_ids
+                dset_reactant_ids[total_reactions:new_len] = buf_reactant_ids
+                dset_product_ids[total_reactions:new_len] = buf_product_ids
+                dset_atom_map[total_reactions:new_len] = buf_atom_map
+                dset_bond_map[total_reactions:new_len] = buf_bond_map
+                dset_bond_idx[total_reactions:new_len] = np.array(buf_bond_idx, dtype=np.int32)
+                dset_energies[total_reactions:new_len] = np.array(buf_energies, dtype=np.float32)
+
+                total_reactions = new_len
+
+                # Clear buffers
+                buf_rxn_ids = []
+                buf_reactant_ids = []
+                buf_product_ids = []
+                buf_atom_map = []
+                buf_bond_map = []
+                buf_bond_idx = []
+                buf_energies = []
+
+        # Write remaining reactions
+        if buf_rxn_ids:
+            new_len = total_reactions + len(buf_rxn_ids)
+
+            dset_rxn_ids.resize((new_len,))
+            dset_reactant_ids.resize((new_len,))
+            dset_product_ids.resize((new_len,))
+            dset_atom_map.resize((new_len,))
+            dset_bond_map.resize((new_len,))
+            dset_bond_idx.resize((new_len,))
+            dset_energies.resize((new_len,))
+
+            dset_rxn_ids[total_reactions:new_len] = buf_rxn_ids
+            dset_reactant_ids[total_reactions:new_len] = buf_reactant_ids
+            dset_product_ids[total_reactions:new_len] = buf_product_ids
+            dset_atom_map[total_reactions:new_len] = buf_atom_map
+            dset_bond_map[total_reactions:new_len] = buf_bond_map
+            dset_bond_idx[total_reactions:new_len] = np.array(buf_bond_idx, dtype=np.int32)
+            dset_energies[total_reactions:new_len] = np.array(buf_energies, dtype=np.float32)
+
+            total_reactions = new_len
+
+        f.attrs['num_reactions'] = total_reactions
         f.attrs['created_by'] = 'NExtIMS BonDNet HDF5 Converter v2'
 
     logger.info("="*80)
     logger.info(f"✓ HDF5 dataset created successfully: {output_h5}")
-    logger.info(f"  Molecules: {len(molecules_smiles):,}")
-    logger.info(f"  Reactions: {len(reactions):,}")
+    logger.info(f"  Molecules: {total_molecules:,}")
+    logger.info(f"  Reactions: {total_reactions:,}")
     logger.info(f"  File size: {Path(output_h5).stat().st_size / 1024 / 1024:.1f} MB")
     logger.info("="*80)
 
@@ -213,46 +296,61 @@ class BonDNetHDF5Dataset(Dataset):
 
         # Build graph
         num_atoms = mol.GetNumAtoms()
+        num_bonds = mol.GetNumBonds()
 
-        # Node features (atom features)
-        # Simplified features - in production should use bondnet.data.featurizer
-        node_features = []
-        for atom in mol.GetAtoms():
-            features = [
-                atom.GetAtomicNum(),
-                atom.GetTotalDegree(),
-                atom.GetFormalCharge(),
-                atom.GetTotalNumHs(),
-                atom.GetNumRadicalElectrons(),
-                int(atom.GetHybridization()),
-                int(atom.GetIsAromatic()),
-                int(atom.IsInRing()),
-            ]
-            node_features.append(features)
+        # Featurizers
+        if AtomFeaturizerFull is None:
+            raise ImportError("BonDNet featurizers not found. Please install bondnet.")
+
+        atom_featurizer = AtomFeaturizerFull()
+        # BondAsNodeFeaturizerFull expects 'length_featurizer' argument (can be None) and 'dative' (default False)
+        # Checking signature or common usage in BondNet repo
+        # From earlier `read_file` of `train_bde_distributed.py`:
+        # bond_featurizer = BondAsNodeFeaturizerFull(length_featurizer=None, dative=False)
+        bond_featurizer = BondAsNodeFeaturizerFull(length_featurizer=None, dative=False)
+
+        # Atom features
+        # atom_featurizer(mol) returns a dict {'atom': tensor}
+        # We need to provide dataset_species for one-hot encoding of atom types.
+        # This list should cover all elements in the dataset.
+        # Common elements in organic chemistry/BDE datasets:
+        species = ["H", "C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
+
+        atom_feats_dict = atom_featurizer(mol, dataset_species=species)
+        node_features = atom_feats_dict['feat']
+
+        # Bond features (as nodes)
+        # bond_featurizer(mol) returns a dict with 'feat' key.
+        bond_feats_dict = bond_featurizer(mol)
 
         # Edge list
         edges_src = []
         edges_dst = []
-        edge_features = []
 
-        for bond in mol.GetBonds():
-            i = bond.GetBeginAtomIdx()
-            j = bond.GetEndAtomIdx()
+        # BondNet featurizer returns features in order of mol.GetBonds()
+        # So we can just use the returned tensor directly for 'bond' nodes
 
-            features = [
-                float(bond.GetBondTypeAsDouble()),
-                float(bond.GetIsConjugated()),
-                float(bond.GetIsAromatic()),
-                float(bond.IsInRing()),
-            ]
+        # Construct connectivity
+        a2b_src = []
+        a2b_dst = []
+        b2a_src = []
+        b2a_dst = []
 
-            # Add bidirectional edges
-            edges_src.extend([i, j])
-            edges_dst.extend([j, i])
-            edge_features.extend([features, features])
+        for b_idx, bond in enumerate(mol.GetBonds()):
+            u = bond.GetBeginAtomIdx()
+            v = bond.GetEndAtomIdx()
+
+            a2b_src.extend([u, v])
+            a2b_dst.extend([b_idx, b_idx])
+
+            b2a_src.extend([b_idx, b_idx])
+            b2a_dst.extend([u, v])
+
+            # Record edges for a2a (simple connectivity)
+            edges_src.extend([u, v])
+            edges_dst.extend([v, u])
 
         # Create DGL graph
-        # BonDNet uses HeteroGraphs with 'atom' and 'bond' nodes or Homogeneous graphs treated as Hetero
         # But GatedGCNReactionNetwork usually expects a heterograph or specific node types.
         # Based on error 'Expect ntype in ['_N'], got atom', our current graph is homogeneous (ntype '_N').
         # We should create a heterograph with 'atom' nodes (and maybe 'bond' nodes if we use line graph)
@@ -387,12 +485,20 @@ class BonDNetHDF5Dataset(Dataset):
             data_dict[('global', 'g2g', 'global')] = (torch.zeros(1, dtype=torch.long), torch.zeros(1, dtype=torch.long))
 
             g = dgl.heterograph(data_dict, num_nodes_dict={'atom': num_atoms, 'bond': num_bonds, 'global': 1})
-            if num_bonds > 0:
-                g.nodes['bond'].data['feat'] = torch.tensor(bond_feats_reordered, dtype=torch.float32)
-            else:
-                g.nodes['bond'].data['feat'] = torch.zeros((0, 4), dtype=torch.float32)
 
-        g.nodes['atom'].data['feat'] = torch.tensor(node_features, dtype=torch.float32)
+            if num_bonds > 0:
+                g.nodes['bond'].data['feat'] = bond_feats_dict['feat']
+            else:
+                # Empty bond features with correct shape (last dim)
+                # If 0 bonds, we still need correct shape for model.
+                # Create a dummy molecule to get shape
+                dummy_mol = Chem.MolFromSmiles('CC')
+                dummy_mol = Chem.AddHs(dummy_mol)
+                dummy_feats = bond_featurizer(dummy_mol)['feat']
+                feat_dim = dummy_feats.shape[1]
+                g.nodes['bond'].data['feat'] = torch.zeros((0, feat_dim), dtype=torch.float32)
+
+        g.nodes['atom'].data['feat'] = node_features
         # Global node feature (empty/zero)
         g.nodes['global'].data['feat'] = torch.zeros((1, 0), dtype=torch.float32)
 
