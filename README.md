@@ -98,8 +98,19 @@ python scripts/convert_bde_db2_to_bondnet.py \
     --output data/processed/bondnet_training/
 
 # ステップ3: BonDNet学習（48-72時間）
+# メモリ効率化のためHDF5を使用することを推奨します
+
+# 3a. HDF5データセット作成（数分〜数時間）
+python scripts/bondnet_hdf5_dataset.py \
+    --molecule-file data/processed/bondnet_training/molecules.sdf \
+    --molecule-attributes data/processed/bondnet_training/molecule_attributes.yaml \
+    --reaction-file data/processed/bondnet_training/reactions.yaml \
+    --output data/processed/bondnet_training/bondnet_data.h5
+
+# 3b. HDF5を使用して学習
 python scripts/train_bondnet_bde_db2.py \
     --data-dir data/processed/bondnet_training/ \
+    --use-hdf5 \
     --output models/bondnet_bde_db2_best.pth
 
 # NIST17カバレッジ: ~99%+ (ハロゲン含有化合物対応)
