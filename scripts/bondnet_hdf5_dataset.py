@@ -179,24 +179,35 @@ def create_hdf5_dataset(
         reactions_group = f.create_group('reactions')
 
         dset_rxn_ids = reactions_group.create_dataset('reaction_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
-        dset_reactant_ids = reactions_group.create_dataset('reactant_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+        # Storing reactant indices (int) directly instead of string IDs, as input is often indices
+        # But for compatibility/generality, we can stick to storing what we get, but handle the key name 'reactants'.
+        # However, to support indices efficiently, let's use int32 for reactant_index if input is index.
+        # But input might be string IDs in some datasets.
+        # Let's check first item.
+
+        with open(reaction_file, 'r') as rxn_f:
+            reactions = yaml.safe_load(rxn_f)
+            if reactions is None:
+                reactions = []
+
+        use_int_indices = False
+        if len(reactions) > 0:
+            first_rxn = reactions[0]
+            # Check for 'reactants' (list) or 'reactant' (string/int)
+            if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
+                use_int_indices = True
+                logger.info("Detected integer indices in reactions.yaml")
+
+        if use_int_indices:
+            dset_reactant_ids = reactions_group.create_dataset('reactant_indices', shape=(0,), maxshape=(None,), dtype=np.int32, chunks=(CHUNK_SIZE,))
+        else:
+            dset_reactant_ids = reactions_group.create_dataset('reactant_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
+
         dset_product_ids = reactions_group.create_dataset('product_ids_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
         dset_atom_map = reactions_group.create_dataset('atom_mapping_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
         dset_bond_map = reactions_group.create_dataset('bond_mapping_json', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
         dset_bond_idx = reactions_group.create_dataset('bond_indices', shape=(0,), maxshape=(None,), dtype=np.int32, chunks=(CHUNK_SIZE,))
         dset_energies = reactions_group.create_dataset('energies', shape=(0,), maxshape=(None,), dtype=np.float32, chunks=(CHUNK_SIZE,))
-
-        # YAML loading of a huge file is memory intensive.
-        # Standard yaml.safe_load loads the whole document.
-        # If reaction_file is huge, we should parse it iteratively if possible, or assume user has enough RAM for YAML load
-        # even if they don't have enough for the full object processing + HDF5 overhead.
-        # For now, we load YAML once (as in original) but process/write in chunks to avoid doubling memory usage.
-
-        with open(reaction_file, 'r') as rxn_f:
-            reactions = yaml.safe_load(rxn_f)
-            # If reactions is None (empty file), make it empty list
-            if reactions is None:
-                reactions = []
 
         # Buffer for reactions
         buf_rxn_ids = []
@@ -213,7 +224,21 @@ def create_hdf5_dataset(
 
         for rxn_idx, rxn in enumerate(tqdm(reactions, desc="Writing reactions")):
             buf_rxn_ids.append(rxn.get('id', f'rxn_{rxn_idx}'))
-            buf_reactant_ids.append(rxn['reactant'])
+
+            if use_int_indices:
+                # Expect 'reactants' list of ints, take first
+                reactants = rxn.get('reactants', [0])
+                if not reactants: reactants = [0]
+                buf_reactant_ids.append(reactants[0])
+            else:
+                # Expect 'reactant' or 'reactants' (list of strings or single string)
+                r = rxn.get('reactant')
+                if r is None:
+                    rs = rxn.get('reactants')
+                    if rs and isinstance(rs, list): r = rs[0]
+                    else: r = str(rs) if rs is not None else ""
+                buf_reactant_ids.append(str(r))
+
             buf_product_ids.append(json.dumps(rxn.get('products', [])))
             buf_atom_map.append(json.dumps(rxn.get('atom_mapping', [])))
             buf_bond_map.append(json.dumps(rxn.get('bond_mapping', [])))
@@ -539,15 +564,21 @@ class BonDNetHDF5Dataset(Dataset):
         """
         with h5py.File(self.h5_file, 'r') as f:
             # Load reaction metadata
-            reactant_id = f['reactions/reactant_ids'][idx]
+            # Check if using indices or IDs
+            if 'reactant_indices' in f['reactions']:
+                reactant_idx = f['reactions/reactant_indices'][idx]
+                # Use str(idx) as ID key for cache if needed, or just idx
+                reactant_id = str(reactant_idx)
+            else:
+                reactant_id = f['reactions/reactant_ids'][idx]
+                if isinstance(reactant_id, bytes):
+                    reactant_id = reactant_id.decode('utf-8')
+                reactant_idx = self.molecule_id_to_idx[reactant_id]
+
             product_ids_json = f['reactions/product_ids_json'][idx]
             atom_mapping_json = f['reactions/atom_mapping_json'][idx]
             bond_mapping_json = f['reactions/bond_mapping_json'][idx]
             energy = f['reactions/energies'][idx]
-
-            # Decode strings
-            if isinstance(reactant_id, bytes):
-                reactant_id = reactant_id.decode('utf-8')
 
             if isinstance(product_ids_json, bytes):
                 product_ids_json = product_ids_json.decode('utf-8')
@@ -565,23 +596,31 @@ class BonDNetHDF5Dataset(Dataset):
             # Convert keys back to int
             bond_mapping = [{int(k): v for k, v in mp.items()} for mp in bond_mapping]
 
-            # Load SMILES using index lookup
-            reactant_idx = self.molecule_id_to_idx[reactant_id]
+            # Load SMILES
             reactant_smiles = f['molecule_smiles'][reactant_idx]
             if isinstance(reactant_smiles, bytes):
                 reactant_smiles = reactant_smiles.decode('utf-8')
 
             product_smiles_list = []
+            product_id_list = [] # needed for caching keys
             for pid in product_ids:
-                pidx = self.molecule_id_to_idx[pid]
+                # pid can be int (index) or string (ID)
+                if isinstance(pid, int):
+                    pidx = pid
+                    pid_str = str(pid)
+                else:
+                    pidx = self.molecule_id_to_idx[pid]
+                    pid_str = pid
+
                 psmiles = f['molecule_smiles'][pidx]
                 if isinstance(psmiles, bytes):
                     psmiles = psmiles.decode('utf-8')
                 product_smiles_list.append(psmiles)
+                product_id_list.append(pid_str)
 
         # Generate graphs
         reactant_graph = self._get_graph(reactant_id, reactant_smiles)
-        product_graphs = [self._get_graph(pid, psmiles) for pid, psmiles in zip(product_ids, product_smiles_list)]
+        product_graphs = [self._get_graph(pid, psmiles) for pid, psmiles in zip(product_id_list, product_smiles_list)]
 
         return {
             'reactant_graph': reactant_graph,
