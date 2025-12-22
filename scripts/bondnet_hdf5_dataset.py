@@ -93,6 +93,25 @@ def create_hdf5_dataset(
     with open(molecule_attributes_file, 'r') as f:
         molecule_attributes = yaml.safe_load(f)
 
+    # Handle the case where molecule_attributes is a list of dictionaries (row-based)
+    # instead of a dictionary of lists (column-based).
+    if isinstance(molecule_attributes, list):
+        logger.info("Detected list-based molecule attributes. Converting to dictionary format...")
+        if not molecule_attributes:
+            molecule_attributes = {}
+        elif isinstance(molecule_attributes[0], dict):
+            # Convert list of dicts to dict of lists
+            # Assume all dicts have the same keys
+            keys = molecule_attributes[0].keys()
+            new_attributes = {k: [] for k in keys}
+            for item in molecule_attributes:
+                for k in keys:
+                    new_attributes[k].append(item.get(k, None))  # Use None for missing values
+            molecule_attributes = new_attributes
+        else:
+            logger.warning("Unknown format for molecule_attributes list. Skipping attributes.")
+            molecule_attributes = {}
+
     # Load reactions
     logger.info(f"Loading reactions from: {reaction_file}")
     with open(reaction_file, 'r') as f:
