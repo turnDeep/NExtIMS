@@ -281,7 +281,8 @@ def train_with_hdf5(
     model.to(device_obj)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
+    # verbose argument is deprecated/removed in newer PyTorch versions
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
     loss_fn = nn.MSELoss()
     metric_fn = WeightedL1Loss(reduction="sum")
 
