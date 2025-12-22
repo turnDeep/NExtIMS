@@ -139,9 +139,38 @@ def create_hdf5_dataset(
 
         if molecule_attributes:
             attrs_group = f.create_group('molecule_attributes')
-            for key, values in molecule_attributes.items():
-                if isinstance(values, list):
-                    attrs_group.create_dataset(key, data=np.array(values))
+
+            # Check if attributes are a list (row-oriented) or dict (column-oriented)
+            if isinstance(molecule_attributes, list) and len(molecule_attributes) > 0:
+                # Convert list of dicts (rows) to dict of lists (columns)
+                logger.info("  Converting attributes list to column format...")
+                # Assume all dicts have same keys
+                keys = molecule_attributes[0].keys()
+                columnar_attributes = {k: [] for k in keys}
+
+                for item in molecule_attributes:
+                    for k in keys:
+                        columnar_attributes[k].append(item.get(k))
+
+                # Write columns
+                for key, values in columnar_attributes.items():
+                    # Handle varying types if necessary, but HDF5 prefers consistent types
+                    # Try to infer type from first element or use generic
+                    try:
+                        attrs_group.create_dataset(key, data=np.array(values))
+                    except Exception as e:
+                        logger.warning(f"  Skipping attribute {key}: {e}")
+
+            elif isinstance(molecule_attributes, dict):
+                # Already in dict format (possibly columns?)
+                for key, values in molecule_attributes.items():
+                    if isinstance(values, list):
+                        try:
+                            attrs_group.create_dataset(key, data=np.array(values))
+                        except Exception as e:
+                            logger.warning(f"  Skipping attribute {key}: {e}")
+            else:
+                logger.warning("  Unknown attribute format (not list or dict), skipping.")
 
         # --- Reactions ---
         logger.info(f"Loading reactions from: {reaction_file}")
