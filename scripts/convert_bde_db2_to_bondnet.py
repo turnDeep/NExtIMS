@@ -237,6 +237,102 @@ def create_molecule_attributes(successful_smiles_list, output_path):
     return len(attributes)
 
 
+def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
+    """
+    Calculate atom and bond mappings between parent and products (fragments)
+    """
+    try:
+        # Reconstruct parent molecule (same logic as create_sdf_file)
+        parent = Chem.MolFromSmiles(parent_smiles)
+        if parent is None: return [], []
+        parent = Chem.AddHs(parent)
+
+        # Validate bond_index
+        if bond_index < 0 or bond_index >= parent.GetNumBonds():
+             return [], []
+
+        # Break bond
+        rw_mol = Chem.RWMol(parent)
+        bond = parent.GetBondWithIdx(bond_index)
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+
+        rw_mol.RemoveBond(a1, a2)
+
+        # Set radicals (homolytic cleavage)
+        atom1 = rw_mol.GetAtomWithIdx(a1)
+        atom1.SetNumRadicalElectrons(atom1.GetNumRadicalElectrons() + 1)
+        atom2 = rw_mol.GetAtomWithIdx(a2)
+        atom2.SetNumRadicalElectrons(atom2.GetNumRadicalElectrons() + 1)
+
+        # Sanitize to fix valences
+        try:
+            Chem.SanitizeMol(rw_mol)
+        except:
+            pass
+
+        frags_indices = Chem.GetMolFrags(rw_mol, asMols=False)
+        frags_mols = Chem.GetMolFrags(rw_mol, asMols=True, sanitizeFrags=False)
+
+        # Reconstruct target fragments
+        target_mols = []
+        for s in product_smiles_list:
+            m = Chem.MolFromSmiles(s)
+            if m: target_mols.append(Chem.AddHs(m))
+            else: target_mols.append(None)
+
+        if len(frags_mols) != len(target_mols):
+            # Mismatch in number of fragments (should be 2)
+            return [], []
+
+        atom_mappings = [None] * len(target_mols)
+        used_gen_indices = set()
+
+        for t_idx, target_mol in enumerate(target_mols):
+            if target_mol is None: continue
+
+            for g_idx, gen_frag in enumerate(frags_mols):
+                if g_idx in used_gen_indices: continue
+
+                if target_mol.GetNumAtoms() == gen_frag.GetNumAtoms():
+                    # Isomorphism check
+                    match = target_mol.GetSubstructMatch(gen_frag)
+                    if match:
+                        # Construct mapping: Parent -> Target
+                        # Parent Atom P -> GenFrag Atom G (G is index in gen_frag, but P = frags_indices[g_idx][G])
+                        # GenFrag Atom G -> Target Atom T (T = match[G])
+                        # Map: P -> T
+                        mapping = {int(frags_indices[g_idx][j]): int(match[j]) for j in range(len(frags_indices[g_idx]))}
+                        atom_mappings[t_idx] = mapping
+                        used_gen_indices.add(g_idx)
+                        break
+
+        if any(m is None for m in atom_mappings):
+            return [], []
+
+        # Bond Mapping
+        bond_mappings = [{} for _ in atom_mappings]
+        for b in parent.GetBonds():
+            b_idx = b.GetIdx()
+            if b_idx == bond_index: continue
+
+            u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+
+            # Find which mapping contains u and v
+            for t_idx, mapping in enumerate(atom_mappings):
+                if u in mapping and v in mapping:
+                    u_t, v_t = mapping[u], mapping[v]
+                    target_mol = target_mols[t_idx]
+                    target_bond = target_mol.GetBondBetweenAtoms(u_t, v_t)
+                    if target_bond:
+                        bond_mappings[t_idx][int(b_idx)] = int(target_bond.GetIdx())
+                    break
+
+        return atom_mappings, bond_mappings
+
+    except Exception as e:
+        return [], []
+
+
 def create_reactions_file(molecules_dict, output_path, smiles_to_index):
     """Create reactions.yaml with BDE data using molecule indices
 
@@ -271,10 +367,20 @@ def create_reactions_file(molecules_dict, output_path, smiles_to_index):
             frag1_idx = smiles_to_index[frag1_smiles]
             frag2_idx = smiles_to_index[frag2_smiles]
 
+            # Calculate mappings
+            product_smiles_list = [frag1_smiles, frag2_smiles]
+            atom_maps, bond_maps = calculate_mappings(parent_smiles, bde_entry['bond_index'], product_smiles_list)
+
+            if not atom_maps:
+                skipped_count += 1
+                continue
+
             # BonDNet expects reactants and products as INTEGER INDICES
             reaction = {
                 'reactants': [parent_idx],  # Index, not SMILES
                 'products': [frag1_idx, frag2_idx],  # Indices, not SMILES
+                'atom_mapping': atom_maps,
+                'bond_mapping': bond_maps,
                 'energy': bde_entry['bde_enthalpy'],  # BonDNet expects this key
                 'bond_index': bde_entry['bond_index'],
                 'bde_enthalpy': bde_entry['bde_enthalpy'],  # Keep for reference
