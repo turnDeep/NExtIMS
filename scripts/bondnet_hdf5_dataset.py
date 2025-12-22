@@ -496,6 +496,12 @@ class BonDNetHDF5Dataset(Dataset):
             # Convert keys back to int
             bond_mapping = [{int(k): v for k, v in mp.items()} for mp in bond_mapping]
 
+            # Ensure mappings are not empty (fixes ValueError in bondnet)
+            if not atom_mapping:
+                atom_mapping = [{}]
+            if not bond_mapping:
+                bond_mapping = [{}]
+
             # Load SMILES
             reactant_smiles = f['molecule_smiles'][reactant_idx]
             if isinstance(reactant_smiles, bytes):
