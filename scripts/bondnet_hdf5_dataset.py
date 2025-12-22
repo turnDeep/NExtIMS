@@ -350,6 +350,13 @@ class BonDNetHDF5Dataset(Dataset):
 
         # Build graph
         num_atoms = mol.GetNumAtoms()
+
+        # Ensure we have atoms (fallback if AddHs somehow resulted in empty mol, though unlikely for valid SMILES)
+        if num_atoms == 0:
+            mol = Chem.MolFromSmiles('C')
+            mol = Chem.AddHs(mol)
+            num_atoms = mol.GetNumAtoms()
+
         num_bonds = mol.GetNumBonds()
 
         # Featurizers
