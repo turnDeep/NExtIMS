@@ -35,6 +35,9 @@ from tqdm import tqdm
 import dgl
 from dgl import DGLGraph
 from collections import defaultdict
+from rdkit import RDLogger
+
+RDLogger.DisableLog('rdApp.*')
 
 # Attempt to import BondNet classes
 try:
@@ -559,6 +562,22 @@ class BonDNetHDF5Dataset(Dataset):
             logger.warning(f"Skipping reaction {idx}: Atoms present ({num_atoms}) but no atom_mapping.")
             return None
 
+        # Check atom mapping indices
+        r_num_atoms = reactant_graph.num_nodes('atom')
+        for i, mapping in enumerate(atom_mapping):
+            if i >= len(product_graphs):
+                break
+            p_graph = product_graphs[i]
+            p_num_atoms = p_graph.num_nodes('atom')
+
+            for r_idx, p_idx in mapping.items():
+                if r_idx >= r_num_atoms:
+                    logger.warning(f"Skipping reaction {idx}: atom_mapping reactant index {r_idx} >= reactant atoms {r_num_atoms}")
+                    return None
+                if p_idx >= p_num_atoms:
+                    logger.warning(f"Skipping reaction {idx}: atom_mapping product index {p_idx} >= product {i} atoms {p_num_atoms}")
+                    return None
+
         # Check bond mapping consistency
         # If bond_mapping is empty, it might be valid (no bonds) or invalid (missing map).
         num_bonds = reactant_graph.num_nodes('bond')
@@ -569,6 +588,22 @@ class BonDNetHDF5Dataset(Dataset):
             else:
                 # Valid case (no bonds), apply fix to prevent ValueError in bondnet
                 bond_mapping = [{}]
+
+        # Check bond mapping indices
+        r_num_bonds = reactant_graph.num_nodes('bond')
+        for i, mapping in enumerate(bond_mapping):
+            if i >= len(product_graphs):
+                break
+            p_graph = product_graphs[i]
+            p_num_bonds = p_graph.num_nodes('bond')
+
+            for r_idx, p_idx in mapping.items():
+                if r_idx >= r_num_bonds:
+                    logger.warning(f"Skipping reaction {idx}: bond_mapping reactant index {r_idx} >= reactant bonds {r_num_bonds}")
+                    return None
+                if p_idx >= p_num_bonds:
+                    logger.warning(f"Skipping reaction {idx}: bond_mapping product index {p_idx} >= product {i} bonds {p_num_bonds}")
+                    return None
 
         return {
             'reactant_graph': reactant_graph,
