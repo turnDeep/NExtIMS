@@ -132,12 +132,12 @@ def create_hdf5_dataset(
 
         # --- Molecule Attributes ---
         logger.info(f"Loading molecule attributes from: {molecule_attributes_file}")
-
+        
         attr_path = Path(molecule_attributes_file)
         jsonl_attr_path = attr_path.with_suffix('.jsonl')
-
+        
         attributes_columns = None
-
+        
         if jsonl_attr_path.exists():
             logger.info(f"Found {jsonl_attr_path}, using streaming JSONL load.")
             attributes_columns = defaultdict(list)
@@ -180,11 +180,11 @@ def create_hdf5_dataset(
         reactions_group = f.create_group('reactions')
 
         dset_rxn_ids = reactions_group.create_dataset('reaction_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
-
+        
         # Determine iterator and indices type
         rxn_path = Path(reaction_file)
         jsonl_rxn_path = rxn_path.with_suffix('.jsonl')
-
+        
         reactions_iter = []
         total_reactions_est = 0
         use_jsonl = False
@@ -193,7 +193,7 @@ def create_hdf5_dataset(
         if jsonl_rxn_path.exists():
             logger.info(f"Found {jsonl_rxn_path}, using streaming JSONL load.")
             use_jsonl = True
-
+            
             # Peek for int indices
             with open(jsonl_rxn_path, 'r') as f_peek:
                 first_line = f_peek.readline()
@@ -207,20 +207,20 @@ def create_hdf5_dataset(
                 with open(jsonl_rxn_path, 'r') as f:
                     for line in f:
                         if line.strip(): yield json.loads(line)
-
+            
             reactions_iter = jsonl_generator()
-            total_reactions_est = None
+            total_reactions_est = None 
         else:
             with open(reaction_file, 'r') as rxn_f:
                 reactions = yaml.safe_load(rxn_f)
                 if reactions is None: reactions = []
-
+                
             if len(reactions) > 0:
                 first_rxn = reactions[0]
                 if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
                     use_int_indices = True
                     logger.info("Detected integer indices in reactions.yaml")
-
+            
             reactions_iter = reactions
             total_reactions_est = len(reactions)
 
