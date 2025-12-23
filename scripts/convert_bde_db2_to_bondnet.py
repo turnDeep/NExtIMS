@@ -204,7 +204,7 @@ def create_molecule_attributes(successful_smiles_list, output_path):
         output_path: Path to output YAML file
     """
     logger.info("Creating molecule_attributes...")
-
+    
     jsonl_path = output_path.with_suffix('.jsonl')
     yaml_path = output_path
 
@@ -227,7 +227,7 @@ def create_molecule_attributes(successful_smiles_list, output_path):
                     'num_bonds': mol.GetNumBonds(),
                     'molecular_weight': Descriptors.MolWt(mol)
                 }
-
+                
                 f_jsonl.write(json.dumps(attr) + '\n')
                 attributes_buffer.append(attr)
                 count += 1
@@ -261,53 +261,53 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
         parent = Chem.MolFromSmiles(parent_smiles)
         if parent is None: return [], []
         parent = Chem.AddHs(parent)
-
+        
         # Validate bond_index
         if bond_index < 0 or bond_index >= parent.GetNumBonds():
              return [], []
-
+        
         # Break bond
         rw_mol = Chem.RWMol(parent)
         bond = parent.GetBondWithIdx(bond_index)
         a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-
+        
         rw_mol.RemoveBond(a1, a2)
-
+        
         # Set radicals (homolytic cleavage)
         atom1 = rw_mol.GetAtomWithIdx(a1)
         atom1.SetNumRadicalElectrons(atom1.GetNumRadicalElectrons() + 1)
         atom2 = rw_mol.GetAtomWithIdx(a2)
         atom2.SetNumRadicalElectrons(atom2.GetNumRadicalElectrons() + 1)
-
+        
         # Sanitize to fix valences
         try:
             Chem.SanitizeMol(rw_mol)
         except:
-            pass
+            pass 
 
         frags_indices = Chem.GetMolFrags(rw_mol, asMols=False)
         frags_mols = Chem.GetMolFrags(rw_mol, asMols=True, sanitizeFrags=False)
-
+        
         # Reconstruct target fragments
         target_mols = []
         for s in product_smiles_list:
             m = Chem.MolFromSmiles(s)
             if m: target_mols.append(Chem.AddHs(m))
             else: target_mols.append(None)
-
+        
         if len(frags_mols) != len(target_mols):
             # Mismatch in number of fragments (should be 2)
             return [], []
 
         atom_mappings = [None] * len(target_mols)
         used_gen_indices = set()
-
+        
         for t_idx, target_mol in enumerate(target_mols):
             if target_mol is None: continue
-
+            
             for g_idx, gen_frag in enumerate(frags_mols):
                 if g_idx in used_gen_indices: continue
-
+                
                 if target_mol.GetNumAtoms() == gen_frag.GetNumAtoms():
                     # Isomorphism check
                     match = target_mol.GetSubstructMatch(gen_frag)
@@ -320,7 +320,7 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
                         atom_mappings[t_idx] = mapping
                         used_gen_indices.add(g_idx)
                         break
-
+        
         if any(m is None for m in atom_mappings):
             return [], []
 
@@ -329,9 +329,9 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
         for b in parent.GetBonds():
             b_idx = b.GetIdx()
             if b_idx == bond_index: continue
-
+            
             u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-
+            
             # Find which mapping contains u and v
             for t_idx, mapping in enumerate(atom_mappings):
                 if u in mapping and v in mapping:
@@ -341,7 +341,7 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
                     if target_bond:
                         bond_mappings[t_idx][int(b_idx)] = int(target_bond.GetIdx())
                     break
-
+        
         return atom_mappings, bond_mappings
 
     except Exception as e:
@@ -357,7 +357,7 @@ def create_reactions_file(molecules_dict, output_path, smiles_to_index):
         smiles_to_index: Dictionary mapping SMILES to index in molecules.sdf
     """
     logger.info("Creating reactions...")
-
+    
     jsonl_path = output_path.with_suffix('.jsonl')
     yaml_path = output_path
 
@@ -388,7 +388,7 @@ def create_reactions_file(molecules_dict, output_path, smiles_to_index):
                 # Calculate mappings
                 product_smiles_list = [frag1_smiles, frag2_smiles]
                 atom_maps, bond_maps = calculate_mappings(parent_smiles, bde_entry['bond_index'], product_smiles_list)
-
+                
                 if not atom_maps:
                     skipped_count += 1
                     continue
@@ -405,10 +405,10 @@ def create_reactions_file(molecules_dict, output_path, smiles_to_index):
                     'reaction_type': 'bond_dissociation',
                     'homolytic': True
                 }
-
+                
                 # Write to JSONL stream
                 f_jsonl.write(json.dumps(reaction) + '\n')
-
+                
                 # Keep in buffer for YAML (if memory allows)
                 reactions_buffer.append(reaction)
                 reaction_count += 1
