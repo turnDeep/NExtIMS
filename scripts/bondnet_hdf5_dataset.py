@@ -34,6 +34,7 @@ import json
 from tqdm import tqdm
 import dgl
 from dgl import DGLGraph
+from collections import defaultdict
 
 # Attempt to import BondNet classes
 try:
@@ -130,73 +131,98 @@ def create_hdf5_dataset(
         f.attrs['num_molecules'] = total_molecules
 
         # --- Molecule Attributes ---
-        # Note: Attributes file is typically small enough to load fully, but for consistency let's be careful.
-        # However, YAML loading loads everything at once anyway. If attributes file is huge, this is still a bottleneck.
-        # Assuming attributes file is manageable for now as it's typically metadata.
         logger.info(f"Loading molecule attributes from: {molecule_attributes_file}")
-        with open(molecule_attributes_file, 'r') as attr_f:
-            molecule_attributes = yaml.safe_load(attr_f)
 
-        if molecule_attributes:
+        attr_path = Path(molecule_attributes_file)
+        jsonl_attr_path = attr_path.with_suffix('.jsonl')
+
+        attributes_columns = None
+
+        if jsonl_attr_path.exists():
+            logger.info(f"Found {jsonl_attr_path}, using streaming JSONL load.")
+            attributes_columns = defaultdict(list)
+            try:
+                with open(jsonl_attr_path, 'r') as f_jsonl:
+                    for line in f_jsonl:
+                        if not line.strip(): continue
+                        item = json.loads(line)
+                        for k, v in item.items():
+                            attributes_columns[k].append(v)
+            except Exception as e:
+                logger.warning(f"Failed to load JSONL attributes: {e}. Falling back to YAML.")
+                attributes_columns = None
+
+        if attributes_columns is None:
+            with open(molecule_attributes_file, 'r') as attr_f:
+                molecule_attributes = yaml.safe_load(attr_f)
+
+            if molecule_attributes:
+                if isinstance(molecule_attributes, list) and len(molecule_attributes) > 0:
+                    keys = molecule_attributes[0].keys()
+                    attributes_columns = {k: [] for k in keys}
+                    for item in molecule_attributes:
+                        for k in keys:
+                            attributes_columns[k].append(item.get(k))
+                elif isinstance(molecule_attributes, dict):
+                    attributes_columns = molecule_attributes
+
+        if attributes_columns:
             attrs_group = f.create_group('molecule_attributes')
-
-            # Check if attributes are a list (row-oriented) or dict (column-oriented)
-            if isinstance(molecule_attributes, list) and len(molecule_attributes) > 0:
-                # Convert list of dicts (rows) to dict of lists (columns)
-                logger.info("  Converting attributes list to column format...")
-                # Assume all dicts have same keys
-                keys = molecule_attributes[0].keys()
-                columnar_attributes = {k: [] for k in keys}
-
-                for item in molecule_attributes:
-                    for k in keys:
-                        columnar_attributes[k].append(item.get(k))
-
-                # Write columns
-                for key, values in columnar_attributes.items():
-                    # Handle varying types if necessary, but HDF5 prefers consistent types
-                    # Try to infer type from first element or use generic
-                    try:
-                        attrs_group.create_dataset(key, data=np.array(values))
-                    except Exception as e:
-                        logger.warning(f"  Skipping attribute {key}: {e}")
-
-            elif isinstance(molecule_attributes, dict):
-                # Already in dict format (possibly columns?)
-                for key, values in molecule_attributes.items():
-                    if isinstance(values, list):
-                        try:
-                            attrs_group.create_dataset(key, data=np.array(values))
-                        except Exception as e:
-                            logger.warning(f"  Skipping attribute {key}: {e}")
-            else:
-                logger.warning("  Unknown attribute format (not list or dict), skipping.")
+            for key, values in attributes_columns.items():
+                try:
+                    attrs_group.create_dataset(key, data=np.array(values))
+                except Exception as e:
+                    logger.warning(f"  Skipping attribute {key}: {e}")
 
         # --- Reactions ---
         logger.info(f"Loading reactions from: {reaction_file}")
 
-        # Initialize datasets for reactions
         reactions_group = f.create_group('reactions')
 
         dset_rxn_ids = reactions_group.create_dataset('reaction_ids', shape=(0,), maxshape=(None,), dtype=dt_str, chunks=(CHUNK_SIZE,))
-        # Storing reactant indices (int) directly instead of string IDs, as input is often indices
-        # But for compatibility/generality, we can stick to storing what we get, but handle the key name 'reactants'.
-        # However, to support indices efficiently, let's use int32 for reactant_index if input is index.
-        # But input might be string IDs in some datasets.
-        # Let's check first item.
 
-        with open(reaction_file, 'r') as rxn_f:
-            reactions = yaml.safe_load(rxn_f)
-            if reactions is None:
-                reactions = []
+        # Determine iterator and indices type
+        rxn_path = Path(reaction_file)
+        jsonl_rxn_path = rxn_path.with_suffix('.jsonl')
 
+        reactions_iter = []
+        total_reactions_est = 0
+        use_jsonl = False
         use_int_indices = False
-        if len(reactions) > 0:
-            first_rxn = reactions[0]
-            # Check for 'reactants' (list) or 'reactant' (string/int)
-            if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
-                use_int_indices = True
-                logger.info("Detected integer indices in reactions.yaml")
+
+        if jsonl_rxn_path.exists():
+            logger.info(f"Found {jsonl_rxn_path}, using streaming JSONL load.")
+            use_jsonl = True
+
+            # Peek for int indices
+            with open(jsonl_rxn_path, 'r') as f:
+                first_line = f.readline()
+                if first_line:
+                    first_rxn = json.loads(first_line)
+                    if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
+                        use_int_indices = True
+                        logger.info("Detected integer indices in reactions.jsonl")
+
+            def jsonl_generator():
+                with open(jsonl_rxn_path, 'r') as f:
+                    for line in f:
+                        if line.strip(): yield json.loads(line)
+
+            reactions_iter = jsonl_generator()
+            total_reactions_est = None
+        else:
+            with open(reaction_file, 'r') as rxn_f:
+                reactions = yaml.safe_load(rxn_f)
+                if reactions is None: reactions = []
+
+            if len(reactions) > 0:
+                first_rxn = reactions[0]
+                if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
+                    use_int_indices = True
+                    logger.info("Detected integer indices in reactions.yaml")
+
+            reactions_iter = reactions
+            total_reactions_est = len(reactions)
 
         if use_int_indices:
             dset_reactant_ids = reactions_group.create_dataset('reactant_indices', shape=(0,), maxshape=(None,), dtype=np.int32, chunks=(CHUNK_SIZE,))
@@ -220,9 +246,12 @@ def create_hdf5_dataset(
 
         total_reactions = 0
 
-        logger.info(f"Processing {len(reactions)} reactions...")
+        if total_reactions_est:
+            pbar = tqdm(reactions_iter, total=total_reactions_est, desc="Writing reactions")
+        else:
+            pbar = tqdm(reactions_iter, desc="Writing reactions")
 
-        for rxn_idx, rxn in enumerate(tqdm(reactions, desc="Writing reactions")):
+        for rxn_idx, rxn in enumerate(pbar):
             buf_rxn_ids.append(rxn.get('id', f'rxn_{rxn_idx}'))
 
             if use_int_indices:
