@@ -19,6 +19,7 @@ import os
 import sys
 import argparse
 import logging
+import json
 import pandas as pd
 import yaml
 from pathlib import Path
@@ -196,45 +197,59 @@ def create_sdf_file(all_molecules_list, output_path):
 
 
 def create_molecule_attributes(successful_smiles_list, output_path):
-    """Create molecule_attributes.yaml
+    """Create molecule_attributes.jsonl and .yaml
 
     Args:
         successful_smiles_list: List of SMILES that were successfully written to SDF (in order)
         output_path: Path to output YAML file
     """
-    logger.info("Creating molecule_attributes.yaml...")
+    logger.info("Creating molecule_attributes...")
 
-    # BonDNet expects a LIST of dictionaries, in the same order as molecules.sdf
-    attributes = []
+    jsonl_path = output_path.with_suffix('.jsonl')
+    yaml_path = output_path
 
-    for smiles in tqdm(successful_smiles_list, desc="Processing attributes"):
+    # Use JSONL for primary streaming output
+    attributes_buffer = [] # Buffer for YAML if memory allows
+    count = 0
 
-        try:
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is None:
-                continue
+    with open(jsonl_path, 'w') as f_jsonl:
+        for smiles in tqdm(successful_smiles_list, desc="Processing attributes"):
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is None:
+                    continue
 
-            # Calculate molecular properties
-            # BonDNet expects list format, in same order as molecules.sdf
-            attributes.append({
-                'smiles': smiles,
-                'charge': 0,  # Neutral molecules (fragments might have radicals, but charge=0)
-                'num_atoms': mol.GetNumAtoms(),
-                'num_bonds': mol.GetNumBonds(),
-                'molecular_weight': Descriptors.MolWt(mol)
-            })
+                # Calculate molecular properties
+                attr = {
+                    'smiles': smiles,
+                    'charge': 0,
+                    'num_atoms': mol.GetNumAtoms(),
+                    'num_bonds': mol.GetNumBonds(),
+                    'molecular_weight': Descriptors.MolWt(mol)
+                }
 
-        except Exception as e:
-            logger.debug(f"Failed to process attributes for {smiles}: {e}")
+                f_jsonl.write(json.dumps(attr) + '\n')
+                attributes_buffer.append(attr)
+                count += 1
 
-    # Write YAML as a list
-    with open(output_path, 'w') as f:
-        yaml.dump(attributes, f, default_flow_style=False, sort_keys=False)
+            except Exception as e:
+                logger.debug(f"Failed to process attributes for {smiles}: {e}")
 
-    logger.info(f"✓ Created {output_path}")
-    logger.info(f"  Molecules: {len(attributes):,}")
+    logger.info(f"✓ Created {jsonl_path}")
 
-    return len(attributes)
+    # Try to write YAML for legacy compatibility
+    try:
+        logger.info(f"Writing {yaml_path} (this may take memory)...")
+        with open(yaml_path, 'w') as f:
+            yaml.dump(attributes_buffer, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"✓ Created {yaml_path}")
+    except Exception as e:
+        logger.warning(f"Could not create YAML file (likely OOM): {e}")
+        logger.warning("Use JSONL file instead.")
+
+    logger.info(f"  Molecules: {count:,}")
+
+    return count
 
 
 def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
@@ -334,68 +349,82 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
 
 
 def create_reactions_file(molecules_dict, output_path, smiles_to_index):
-    """Create reactions.yaml with BDE data using molecule indices
+    """Create reactions.jsonl and .yaml
 
     Args:
         molecules_dict: Dictionary of parent molecule SMILES and their BDE data
         output_path: Path to output YAML file
         smiles_to_index: Dictionary mapping SMILES to index in molecules.sdf
     """
-    logger.info("Creating reactions.yaml...")
+    logger.info("Creating reactions...")
 
-    reactions = []
+    jsonl_path = output_path.with_suffix('.jsonl')
+    yaml_path = output_path
+
+    reactions_buffer = []
     reaction_count = 0
     skipped_count = 0
 
-    for parent_smiles, bde_list in tqdm(molecules_dict.items(), desc="Processing reactions"):
-        # Skip parent molecule if not in index (failed SDF generation)
-        if parent_smiles not in smiles_to_index:
-            skipped_count += len(bde_list)
-            continue
-
-        parent_idx = smiles_to_index[parent_smiles]
-
-        for bde_entry in bde_list:
-            frag1_smiles = bde_entry['fragment1']
-            frag2_smiles = bde_entry['fragment2']
-
-            # Skip if fragments not in index (failed SDF generation)
-            if frag1_smiles not in smiles_to_index or frag2_smiles not in smiles_to_index:
-                skipped_count += 1
+    with open(jsonl_path, 'w') as f_jsonl:
+        for parent_smiles, bde_list in tqdm(molecules_dict.items(), desc="Processing reactions"):
+            # Skip parent molecule if not in index (failed SDF generation)
+            if parent_smiles not in smiles_to_index:
+                skipped_count += len(bde_list)
                 continue
 
-            frag1_idx = smiles_to_index[frag1_smiles]
-            frag2_idx = smiles_to_index[frag2_smiles]
+            parent_idx = smiles_to_index[parent_smiles]
 
-            # Calculate mappings
-            product_smiles_list = [frag1_smiles, frag2_smiles]
-            atom_maps, bond_maps = calculate_mappings(parent_smiles, bde_entry['bond_index'], product_smiles_list)
+            for bde_entry in bde_list:
+                frag1_smiles = bde_entry['fragment1']
+                frag2_smiles = bde_entry['fragment2']
 
-            if not atom_maps:
-                skipped_count += 1
-                continue
+                if frag1_smiles not in smiles_to_index or frag2_smiles not in smiles_to_index:
+                    skipped_count += 1
+                    continue
 
-            # BonDNet expects reactants and products as INTEGER INDICES
-            reaction = {
-                'reactants': [parent_idx],  # Index, not SMILES
-                'products': [frag1_idx, frag2_idx],  # Indices, not SMILES
-                'atom_mapping': atom_maps,
-                'bond_mapping': bond_maps,
-                'energy': bde_entry['bde_enthalpy'],  # BonDNet expects this key
-                'bond_index': bde_entry['bond_index'],
-                'bde_enthalpy': bde_entry['bde_enthalpy'],  # Keep for reference
-                'bde_gibbs': bde_entry['bde_gibbs'],  # Keep for reference
-                'reaction_type': 'bond_dissociation',
-                'homolytic': True
-            }
-            reactions.append(reaction)
-            reaction_count += 1
+                frag1_idx = smiles_to_index[frag1_smiles]
+                frag2_idx = smiles_to_index[frag2_smiles]
+
+                # Calculate mappings
+                product_smiles_list = [frag1_smiles, frag2_smiles]
+                atom_maps, bond_maps = calculate_mappings(parent_smiles, bde_entry['bond_index'], product_smiles_list)
+
+                if not atom_maps:
+                    skipped_count += 1
+                    continue
+
+                reaction = {
+                    'reactants': [parent_idx],
+                    'products': [frag1_idx, frag2_idx],
+                    'atom_mapping': atom_maps,
+                    'bond_mapping': bond_maps,
+                    'energy': float(bde_entry['bde_enthalpy']),
+                    'bond_index': int(bde_entry['bond_index']),
+                    'bde_enthalpy': float(bde_entry['bde_enthalpy']),
+                    'bde_gibbs': float(bde_entry['bde_gibbs']),
+                    'reaction_type': 'bond_dissociation',
+                    'homolytic': True
+                }
+
+                # Write to JSONL stream
+                f_jsonl.write(json.dumps(reaction) + '\n')
+
+                # Keep in buffer for YAML (if memory allows)
+                reactions_buffer.append(reaction)
+                reaction_count += 1
+
+    logger.info(f"✓ Created {jsonl_path}")
 
     # Write YAML
-    with open(output_path, 'w') as f:
-        yaml.dump(reactions, f, default_flow_style=False, sort_keys=False)
+    try:
+        logger.info(f"Writing {yaml_path} (this may take memory)...")
+        with open(yaml_path, 'w') as f:
+            yaml.dump(reactions_buffer, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"✓ Created {yaml_path}")
+    except Exception as e:
+        logger.warning(f"Could not create YAML file (likely OOM): {e}")
+        logger.warning("Use JSONL file instead.")
 
-    logger.info(f"✓ Created {output_path}")
     logger.info(f"  Reactions: {reaction_count:,}")
     if skipped_count > 0:
         logger.info(f"  Skipped (missing fragments): {skipped_count:,}")
