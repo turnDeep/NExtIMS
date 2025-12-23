@@ -195,8 +195,8 @@ def create_hdf5_dataset(
             use_jsonl = True
 
             # Peek for int indices
-            with open(jsonl_rxn_path, 'r') as f:
-                first_line = f.readline()
+            with open(jsonl_rxn_path, 'r') as f_peek:
+                first_line = f_peek.readline()
                 if first_line:
                     first_rxn = json.loads(first_line)
                     if 'reactants' in first_rxn and isinstance(first_rxn['reactants'], list) and len(first_rxn['reactants']) > 0 and isinstance(first_rxn['reactants'][0], int):
