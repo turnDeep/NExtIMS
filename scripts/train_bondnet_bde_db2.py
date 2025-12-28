@@ -186,15 +186,18 @@ def train_with_hdf5(
     learning_rate: float = 0.001,
     device: str = 'cuda',
     pretrained_path: Path = None,
-    save_interval: int = 10
+    save_interval: int = 10,
+    cache_graphs: bool = False
 ):
     """
     Train BonDNet using HDF5 dataset.
     """
     logger.info(f"Training with HDF5 dataset: {hdf5_path}")
+    if cache_graphs:
+        logger.info("Graph caching ENABLED (will use more RAM but speed up training)")
 
     # Dataset & Dataloader
-    dataset = BonDNetHDF5Dataset(str(hdf5_path), cache_graphs=False) # Disable cache for true streaming
+    dataset = BonDNetHDF5Dataset(str(hdf5_path), cache_graphs=cache_graphs)
 
     # Simple split (random)
     # Note: For strict reproducibility, use fixed indices or split file
@@ -211,13 +214,21 @@ def train_with_hdf5(
 
     logger.info(f"Train size: {len(train_set)}, Val size: {len(val_set)}")
 
+    # Optimize num_workers based on CPU count if possible, but hardcoding to 8 is safe for this user
+    # Also enabling persistent_workers and prefetch_factor
+    num_workers = 8 if device == 'cuda' else 0
+    persistent = True if num_workers > 0 else False
+    prefetch = 2 if num_workers > 0 else None
+
     train_loader = DataLoader(
         train_set,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_bondnet,
-        num_workers=4 if device == 'cuda' else 0,
-        pin_memory=True if device == 'cuda' else False
+        num_workers=num_workers,
+        pin_memory=True if device == 'cuda' else False,
+        persistent_workers=persistent,
+        prefetch_factor=prefetch
     )
 
     val_loader = DataLoader(
@@ -225,7 +236,9 @@ def train_with_hdf5(
         batch_size=batch_size,
         shuffle=False,
         collate_fn=collate_bondnet,
-        num_workers=4 if device == 'cuda' else 0
+        num_workers=num_workers,
+        persistent_workers=persistent,
+        prefetch_factor=prefetch
     )
 
     # Model Setup
@@ -374,6 +387,7 @@ def main():
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--pretrained', type=str, default=None)
     parser.add_argument('--use-hdf5', action='store_true', help='Use HDF5 memory-efficient loading')
+    parser.add_argument('--cache-graphs', action='store_true', help='Cache graphs in memory (fast but RAM intensive)')
 
     args = parser.parse_args()
 
@@ -394,7 +408,8 @@ def main():
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
             device=args.device,
-            pretrained_path=Path(args.pretrained) if args.pretrained else None
+            pretrained_path=Path(args.pretrained) if args.pretrained else None,
+            cache_graphs=args.cache_graphs
         )
     else:
         # Fallback to original logic (subprocess call) if not using HDF5

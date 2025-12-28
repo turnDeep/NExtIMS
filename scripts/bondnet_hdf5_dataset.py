@@ -352,6 +352,9 @@ class BonDNetHDF5Dataset(Dataset):
         self.cache_graphs = cache_graphs
         self.graph_cache = {} if cache_graphs else None
 
+        # Internal handle to HDF5 file
+        self.db = None
+
         # Load metadata
         with h5py.File(h5_file, 'r') as f:
             self.num_molecules = f.attrs['num_molecules']
@@ -367,6 +370,32 @@ class BonDNetHDF5Dataset(Dataset):
         logger.info(f"  HDF5 file: {h5_file}")
         logger.info(f"  Molecules: {self.num_molecules:,}")
         logger.info(f"  Reactions: {self.num_reactions:,}")
+
+    def __getstate__(self):
+        """
+        Prepare for pickling (e.g., when sending to DataLoader workers).
+        We must exclude the HDF5 file handle 'db' because it cannot be pickled.
+        """
+        state = self.__dict__.copy()
+        state['db'] = None
+        return state
+
+    def __setstate__(self, state):
+        """
+        Restore from pickled state.
+        Initialize 'db' to None so it can be re-opened in the new process.
+        """
+        self.__dict__.update(state)
+        self.db = None
+
+    def _get_db(self):
+        """
+        Lazy-load the HDF5 file handle.
+        This ensures that each worker process gets its own file handle.
+        """
+        if self.db is None:
+            self.db = h5py.File(self.h5_file, 'r', libver='latest', swmr=True)
+        return self.db
 
     def __len__(self) -> int:
         return self.num_reactions
@@ -494,122 +523,79 @@ class BonDNetHDF5Dataset(Dataset):
         """
         Load a single reaction sample with mapping info.
         """
-        with h5py.File(self.h5_file, 'r') as f:
-            # Load reaction metadata
-            # Check if using indices or IDs
-            if 'reactant_indices' in f['reactions']:
-                reactant_idx = f['reactions/reactant_indices'][idx]
-                # Use str(idx) as ID key for cache if needed, or just idx
-                reactant_id = str(reactant_idx)
+        # Use lazy-loaded persistent handle
+        f = self._get_db()
+
+        # Load reaction metadata
+        # Check if using indices or IDs
+        if 'reactant_indices' in f['reactions']:
+            reactant_idx = f['reactions/reactant_indices'][idx]
+            # Use str(idx) as ID key for cache if needed, or just idx
+            reactant_id = str(reactant_idx)
+        else:
+            reactant_id = f['reactions/reactant_ids'][idx]
+            if isinstance(reactant_id, bytes):
+                reactant_id = reactant_id.decode('utf-8')
+            reactant_idx = self.molecule_id_to_idx[reactant_id]
+
+        product_ids_json = f['reactions/product_ids_json'][idx]
+        atom_mapping_json = f['reactions/atom_mapping_json'][idx]
+        bond_mapping_json = f['reactions/bond_mapping_json'][idx]
+        energy = f['reactions/energies'][idx]
+
+        if isinstance(product_ids_json, bytes):
+            product_ids_json = product_ids_json.decode('utf-8')
+        product_ids = json.loads(product_ids_json)
+
+        if isinstance(atom_mapping_json, bytes):
+            atom_mapping_json = atom_mapping_json.decode('utf-8')
+        atom_mapping = json.loads(atom_mapping_json)
+        # Convert keys back to int
+        atom_mapping = [{int(k): v for k, v in mp.items()} for mp in atom_mapping]
+
+        # AUTO-FIX: Check if atom mapping is inverted (Reactant -> Product instead of Product -> Reactant)
+        # Heuristic: If any Key >= len(mapping), it's invalid as a Product Index (which must be 0..len-1).
+        # If swapping Keys and Values makes it valid, do it.
+        for i, mp in enumerate(atom_mapping):
+            if not mp: continue
+            max_key = max(mp.keys())
+            mapping_len = len(mp)
+            
+            if max_key >= mapping_len:
+                # Potential inversion. Check if values are valid as keys.
+                max_val = max(mp.values())
+                if max_val < mapping_len:
+                    # Swapping works!
+                    # logger.warning(f"Reaction {idx}: Detected inverted atom mapping. Auto-fixing.")
+                    atom_mapping[i] = {v: k for k, v in mp.items()}
+
+        if isinstance(bond_mapping_json, bytes):
+            bond_mapping_json = bond_mapping_json.decode('utf-8')
+        bond_mapping = json.loads(bond_mapping_json)
+        # Convert keys back to int
+        bond_mapping = [{int(k): v for k, v in mp.items()} for mp in bond_mapping]
+
+        # Load SMILES
+        reactant_smiles = f['molecule_smiles'][reactant_idx]
+        if isinstance(reactant_smiles, bytes):
+            reactant_smiles = reactant_smiles.decode('utf-8')
+
+        product_smiles_list = []
+        product_id_list = [] # needed for caching keys
+        for pid in product_ids:
+            # pid can be int (index) or string (ID)
+            if isinstance(pid, int):
+                pidx = pid
+                pid_str = str(pid)
             else:
-                reactant_id = f['reactions/reactant_ids'][idx]
-                if isinstance(reactant_id, bytes):
-                    reactant_id = reactant_id.decode('utf-8')
-                reactant_idx = self.molecule_id_to_idx[reactant_id]
+                pidx = self.molecule_id_to_idx[pid]
+                pid_str = pid
 
-            product_ids_json = f['reactions/product_ids_json'][idx]
-            atom_mapping_json = f['reactions/atom_mapping_json'][idx]
-            bond_mapping_json = f['reactions/bond_mapping_json'][idx]
-            energy = f['reactions/energies'][idx]
-
-            if isinstance(product_ids_json, bytes):
-                product_ids_json = product_ids_json.decode('utf-8')
-            product_ids = json.loads(product_ids_json)
-
-            if isinstance(atom_mapping_json, bytes):
-                atom_mapping_json = atom_mapping_json.decode('utf-8')
-            atom_mapping = json.loads(atom_mapping_json)
-            # Convert keys back to int
-            atom_mapping = [{int(k): v for k, v in mp.items()} for mp in atom_mapping]
-
-            # AUTO-FIX: Check if atom mapping is inverted (Reactant -> Product instead of Product -> Reactant)
-            # Heuristic: If any Key >= len(mapping), it's invalid as a Product Index (which must be 0..len-1).
-            # If swapping Keys and Values makes it valid, do it.
-            for i, mp in enumerate(atom_mapping):
-                if not mp: continue
-                max_key = max(mp.keys())
-                mapping_len = len(mp)
-                
-                if max_key >= mapping_len:
-                    # Potential inversion. Check if values are valid as keys.
-                    max_val = max(mp.values())
-                    if max_val < mapping_len:
-                        # Swapping works!
-                        # logger.warning(f"Reaction {idx}: Detected inverted atom mapping. Auto-fixing.")
-                        atom_mapping[i] = {v: k for k, v in mp.items()}
-
-            if isinstance(bond_mapping_json, bytes):
-                bond_mapping_json = bond_mapping_json.decode('utf-8')
-            bond_mapping = json.loads(bond_mapping_json)
-            # Convert keys back to int
-            bond_mapping = [{int(k): v for k, v in mp.items()} for mp in bond_mapping]
-            
-            # AUTO-FIX: Check if bond mapping is inverted
-            # Harder to check because we don't know bond counts here easily without graph.
-            # But if atom mapping was inverted, bond mapping likely is too.
-            # Or we can use the same heuristic: Key >= Length? No, bond mapping is partial.
-            # Key should be Product Bond Index.
-            # If we swapped atom mapping, we should probably swap bond mapping.
-            # However, simpler heuristic:
-            # If keys are unusually large (likely reactant bond indices) and values are small.
-            # But bond mapping size != product bond count.
-            # Let's rely on the fact that if atoms were flipped, bonds are likely flipped.
-            # We can check if keys are >> values.
-            
-            for i, mp in enumerate(bond_mapping):
-                if not mp: continue
-                # Heuristic: If keys > values on average? No.
-                # If we detected atom mapping inversion, we can assume bond mapping is inverted.
-                # But 'i' corresponds to products.
-                
-                # Check consistency with atom mapping fix?
-                # Actually, let's just use the max_key check.
-                # Product bond indices should be small. Reactant bond indices large.
-                # But we don't know the threshold.
-                
-                # Let's assume if ALL atom mappings for this reaction needed fixing, then fix bonds too?
-                # Or check individually.
-                
-                # For safety, let's rely on validation downstream to catch it if we don't fix it.
-                # But to be helpful, let's try to swap if keys look "large" compared to values?
-                # Better yet: if we swapped atom mapping[i], swap bond mapping[i].
-                # But I didn't store that state.
-                
-                # Re-check atom mapping[i] state? No, I already swapped it.
-                # Let's just try to validate. If invalid, try swap.
-                pass
-            
-            # Since I can't easily validate bond mapping without graph loaded, 
-            # and I don't want to load graph twice, I'll defer bond fix. 
-            # If the user regenerated data with my other fix, it will be correct.
-            # If they use old data, atom mapping fix is the most critical as that causes the assertion error.
-            # Bond mapping errors usually result in poor training, not crash (unless index out of bounds).
-            
-            # Actually, let's implement the Swap check if keys are > values significantly?
-            # Or just if max_key is very large.
-            pass
-
-            # Load SMILES
-            reactant_smiles = f['molecule_smiles'][reactant_idx]
-            if isinstance(reactant_smiles, bytes):
-                reactant_smiles = reactant_smiles.decode('utf-8')
-
-            product_smiles_list = []
-            product_id_list = [] # needed for caching keys
-            for pid in product_ids:
-                # pid can be int (index) or string (ID)
-                if isinstance(pid, int):
-                    pidx = pid
-                    pid_str = str(pid)
-                else:
-                    pidx = self.molecule_id_to_idx[pid]
-                    pid_str = pid
-
-                psmiles = f['molecule_smiles'][pidx]
-                if isinstance(psmiles, bytes):
-                    psmiles = psmiles.decode('utf-8')
-                product_smiles_list.append(psmiles)
-                product_id_list.append(pid_str)
+            psmiles = f['molecule_smiles'][pidx]
+            if isinstance(psmiles, bytes):
+                psmiles = psmiles.decode('utf-8')
+            product_smiles_list.append(psmiles)
+            product_id_list.append(pid_str)
 
         # Generate graphs
         reactant_graph = self._get_graph(reactant_id, reactant_smiles)
