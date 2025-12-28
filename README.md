@@ -112,7 +112,7 @@ python scripts/train_bondnet_bde_db2.py \
     --data-dir data/processed/bondnet_training \
     --use-hdf5 \
     --output models/bondnet_bde_db2_best.pth \
-    --patience 20
+    --patience 10
 
 # NIST17カバレッジ: ~99%+ (ハロゲン含有化合物対応)
 ```
