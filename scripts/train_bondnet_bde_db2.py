@@ -218,7 +218,7 @@ def train_with_hdf5(
     # Also enabling persistent_workers and prefetch_factor
     num_workers = 8 if device == 'cuda' else 0
     persistent = True if num_workers > 0 else False
-    prefetch = 2 if num_workers > 0 else None
+    prefetch = 4 if num_workers > 0 else None
 
     train_loader = DataLoader(
         train_set,
