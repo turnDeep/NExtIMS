@@ -565,18 +565,26 @@ class BonDNetHDF5Dataset(Dataset):
         # Check atom mapping indices
         r_num_atoms = reactant_graph.num_nodes('atom')
         for i, mapping in enumerate(atom_mapping):
-            if i >= len(product_graphs):
-                break
-            p_graph = product_graphs[i]
-            p_num_atoms = p_graph.num_nodes('atom')
-
-            for r_idx, p_idx in mapping.items():
+            # BondNet Requirement: p < len(mapping)
+            # This must be checked for ALL mappings, even if we don't have a corresponding product graph loaded yet
+            # (though in a valid reaction, len(atom_mapping) should match len(product_graphs))
+            mapping_len = len(mapping)
+            for p_idx, r_idx in mapping.items():
+                if p_idx >= mapping_len:
+                    logger.warning(f"Skipping reaction {idx}: atom_mapping product index {p_idx} >= mapping length {mapping_len} (BondNet requirement)")
+                    return None
                 if r_idx >= r_num_atoms:
                     logger.warning(f"Skipping reaction {idx}: atom_mapping reactant index {r_idx} >= reactant atoms {r_num_atoms}")
                     return None
-                if p_idx >= p_num_atoms:
-                    logger.warning(f"Skipping reaction {idx}: atom_mapping product index {p_idx} >= product {i} atoms {p_num_atoms}")
-                    return None
+
+            if i < len(product_graphs):
+                p_graph = product_graphs[i]
+                p_num_atoms = p_graph.num_nodes('atom')
+
+                for p_idx, r_idx in mapping.items():
+                    if p_idx >= p_num_atoms:
+                        logger.warning(f"Skipping reaction {idx}: atom_mapping product index {p_idx} >= product {i} atoms {p_num_atoms}")
+                        return None
 
         # Check bond mapping consistency
         # If bond_mapping is empty, it might be valid (no bonds) or invalid (missing map).
@@ -592,18 +600,23 @@ class BonDNetHDF5Dataset(Dataset):
         # Check bond mapping indices
         r_num_bonds = reactant_graph.num_nodes('bond')
         for i, mapping in enumerate(bond_mapping):
-            if i >= len(product_graphs):
-                break
-            p_graph = product_graphs[i]
-            p_num_bonds = p_graph.num_nodes('bond')
-
-            for r_idx, p_idx in mapping.items():
+            mapping_len = len(mapping)
+            for p_idx, r_idx in mapping.items():
+                if p_idx >= mapping_len:
+                    logger.warning(f"Skipping reaction {idx}: bond_mapping product index {p_idx} >= mapping length {mapping_len} (BondNet requirement)")
+                    return None
                 if r_idx >= r_num_bonds:
                     logger.warning(f"Skipping reaction {idx}: bond_mapping reactant index {r_idx} >= reactant bonds {r_num_bonds}")
                     return None
-                if p_idx >= p_num_bonds:
-                    logger.warning(f"Skipping reaction {idx}: bond_mapping product index {p_idx} >= product {i} bonds {p_num_bonds}")
-                    return None
+
+            if i < len(product_graphs):
+                p_graph = product_graphs[i]
+                p_num_bonds = p_graph.num_nodes('bond')
+
+                for p_idx, r_idx in mapping.items():
+                    if p_idx >= p_num_bonds:
+                        logger.warning(f"Skipping reaction {idx}: bond_mapping product index {p_idx} >= product {i} bonds {p_num_bonds}")
+                        return None
 
         return {
             'reactant_graph': reactant_graph,
