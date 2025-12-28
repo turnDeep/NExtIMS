@@ -223,13 +223,26 @@ def train_with_hdf5(
     gnn_hidden_size = 128
     num_gnn_layers = 4
 
-    # Determine feature size from first sample
+    # Determine feature size from first VALID sample
     # BonDNet requires input feature dimension
     # Our HDF5 dataset produces simplified features: 8 for atom, 4 for bond
     # Need to check what GatedGCNReactionNetwork expects.
     # Usually it expects a dict with sizes.
-    # Let's inspect a sample.
-    sample_graph = dataset[0]['reactant_graph']
+
+    sample_graph = None
+    # Check first 1000 samples to find a valid one (dataset might have many invalid entries at start)
+    check_range = min(len(dataset), 1000)
+
+    for i in range(check_range):
+        sample = dataset[i]
+        if sample is not None:
+            sample_graph = sample['reactant_graph']
+            break
+
+    if sample_graph is None:
+        logger.error(f"Could not find any valid samples in the first {check_range} entries!")
+        sys.exit(1)
+
     # For HeteroGraph, ndata returns a dict of features for each node type
     # access atom features: nodes['atom'].data['feat']
     try:
