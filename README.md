@@ -108,10 +108,11 @@ python scripts/bondnet_hdf5_dataset.py \
     --output data/processed/bondnet_training/bondnet_data.h5
 
 # 3b. HDF5を使用して学習
-python scripts/train_bondnet_bde_db2.py \
-    --data-dir data/processed/bondnet_training/ \
-    --use-hdf5 \
+python scripts/train_bondnet_bde_db2.py
+    --data-dir data/processed/bondnet_training/
+    --use-hdf5
     --output models/bondnet_bde_db2_best.pth
+    --cache-graphs
 
 # NIST17カバレッジ: ~99%+ (ハロゲン含有化合物対応)
 ```
