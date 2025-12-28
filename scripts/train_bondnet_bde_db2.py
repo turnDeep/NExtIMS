@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from tqdm import tqdm
 
 # Imports from BondNet (assumed to be installed)
 try:
@@ -57,7 +58,8 @@ def train_one_epoch(model, dataloader, optimizer, loss_fn, device, metric_fn):
     # We need to construct the features dict from the batched graph
     nodes = ["atom", "bond", "global"]
 
-    for i, batch_data in enumerate(dataloader):
+    pbar = tqdm(dataloader, desc="Training", unit="batch")
+    for i, batch_data in enumerate(pbar):
         if batch_data[0] is None:
              continue
         bg, labels = batch_data
@@ -129,7 +131,11 @@ def train_one_epoch(model, dataloader, optimizer, loss_fn, device, metric_fn):
         stdev = labels.get('scaler_stdev', torch.tensor(1.0)).to(device)
         accuracy += metric_fn(pred, target, stdev).item()
         count += len(target)
+        
+        pbar.set_postfix({'loss': loss.item(), 'mae': accuracy / count if count > 0 else 0.0})
 
+    if count == 0:
+        return 0.0, 0.0
     return epoch_loss / (i + 1), accuracy / count
 
 
@@ -140,7 +146,8 @@ def validate(model, dataloader, device, metric_fn):
     nodes = ["atom", "bond", "global"]
 
     with torch.no_grad():
-        for i, batch_data in enumerate(dataloader):
+        pbar = tqdm(dataloader, desc="Validation", unit="batch")
+        for i, batch_data in enumerate(pbar):
             if batch_data[0] is None:
                  continue
             bg, labels = batch_data
@@ -163,7 +170,11 @@ def validate(model, dataloader, device, metric_fn):
             stdev = labels.get('scaler_stdev', torch.tensor(1.0)).to(device)
             accuracy += metric_fn(pred, target, stdev).item()
             count += len(target)
+            
+            pbar.set_postfix({'mae': accuracy / count if count > 0 else 0.0})
 
+    if count == 0:
+        return 0.0
     return accuracy / count
 
 
