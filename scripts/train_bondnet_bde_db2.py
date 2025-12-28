@@ -187,12 +187,14 @@ def train_with_hdf5(
     device: str = 'cuda',
     pretrained_path: Path = None,
     save_interval: int = 10,
-    cache_graphs: bool = False
+    cache_graphs: bool = False,
+    patience: int = 20
 ):
     """
     Train BonDNet using HDF5 dataset.
     """
     logger.info(f"Training with HDF5 dataset: {hdf5_path}")
+    logger.info(f"Early stopping patience: {patience}")
     if cache_graphs:
         logger.info("Graph caching ENABLED (will use more RAM but speed up training)")
 
@@ -333,6 +335,7 @@ def train_with_hdf5(
 
     # Training Loop
     best_val_mae = float('inf')
+    early_stop_counter = 0
 
     logger.info("Starting training...")
     for epoch in range(epochs):
@@ -349,6 +352,7 @@ def train_with_hdf5(
         # Save best
         if val_mae < best_val_mae:
             best_val_mae = val_mae
+            early_stop_counter = 0
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -356,6 +360,13 @@ def train_with_hdf5(
                 'val_mae': val_mae
             }, output_path)
             logger.info(f"  New best model saved! MAE: {val_mae:.4f}")
+        else:
+            early_stop_counter += 1
+            logger.debug(f"  No improvement. Early stop counter: {early_stop_counter}/{patience}")
+
+        if early_stop_counter >= patience:
+            logger.info(f"Early stopping triggered after {patience} epochs without improvement.")
+            break
 
         epoch_time = time.time() - start_time
         logger.info(
@@ -388,6 +399,7 @@ def main():
     parser.add_argument('--pretrained', type=str, default=None)
     parser.add_argument('--use-hdf5', action='store_true', help='Use HDF5 memory-efficient loading')
     parser.add_argument('--cache-graphs', action='store_true', help='Cache graphs in memory (fast but RAM intensive)')
+    parser.add_argument('--patience', type=int, default=20, help='Early stopping patience (epochs)')
 
     args = parser.parse_args()
 
@@ -409,7 +421,8 @@ def main():
             learning_rate=args.learning_rate,
             device=args.device,
             pretrained_path=Path(args.pretrained) if args.pretrained else None,
-            cache_graphs=args.cache_graphs
+            cache_graphs=args.cache_graphs,
+            patience=args.patience
         )
     else:
         # Fallback to original logic (subprocess call) if not using HDF5
