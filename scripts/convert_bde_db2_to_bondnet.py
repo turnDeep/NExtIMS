@@ -317,11 +317,11 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
                         # GenFrag Atom G -> Target Atom T (T = match[G])
                         # Map: P -> T
                         # mapping = {int(frags_indices[g_idx][j]): int(match[j]) for j in range(len(frags_indices[g_idx]))}
-
+                        
                         # BondNet expects mapping from Product -> Reactant (Target -> Parent)
                         # So we need {T: P}
                         mapping = {int(match[j]): int(frags_indices[g_idx][j]) for j in range(len(frags_indices[g_idx]))}
-
+                        
                         atom_mappings[t_idx] = mapping
                         used_gen_indices.add(g_idx)
                         break
@@ -341,18 +341,18 @@ def calculate_mappings(parent_smiles, bond_index, product_smiles_list):
             # mapping is {Product: Reactant}. We need to look up by Value.
             # Create reverse lookup for efficiency? Or just iterate.
             # Since graphs are small, iteration is fine.
-
+            
             for t_idx, mapping in enumerate(atom_mappings):
                 # We need to find if u and v (Reactant atoms) are in this fragment
                 # In the mapping {P: R}, we look for values u and v.
-
+                
                 prod_u = None
                 prod_v = None
-
+                
                 for p_idx, r_idx in mapping.items():
                     if r_idx == u: prod_u = p_idx
                     if r_idx == v: prod_v = p_idx
-
+                
                 if prod_u is not None and prod_v is not None:
                     # Found both atoms in this product fragment
                     target_mol = target_mols[t_idx]
