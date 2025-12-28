@@ -529,7 +529,7 @@ class BonDNetHDF5Dataset(Dataset):
                 if not mp: continue
                 max_key = max(mp.keys())
                 mapping_len = len(mp)
-
+                
                 if max_key >= mapping_len:
                     # Potential inversion. Check if values are valid as keys.
                     max_val = max(mp.values())
@@ -543,7 +543,7 @@ class BonDNetHDF5Dataset(Dataset):
             bond_mapping = json.loads(bond_mapping_json)
             # Convert keys back to int
             bond_mapping = [{int(k): v for k, v in mp.items()} for mp in bond_mapping]
-
+            
             # AUTO-FIX: Check if bond mapping is inverted
             # Harder to check because we don't know bond counts here easily without graph.
             # But if atom mapping was inverted, bond mapping likely is too.
@@ -555,36 +555,36 @@ class BonDNetHDF5Dataset(Dataset):
             # But bond mapping size != product bond count.
             # Let's rely on the fact that if atoms were flipped, bonds are likely flipped.
             # We can check if keys are >> values.
-
+            
             for i, mp in enumerate(bond_mapping):
                 if not mp: continue
                 # Heuristic: If keys > values on average? No.
                 # If we detected atom mapping inversion, we can assume bond mapping is inverted.
                 # But 'i' corresponds to products.
-
+                
                 # Check consistency with atom mapping fix?
                 # Actually, let's just use the max_key check.
                 # Product bond indices should be small. Reactant bond indices large.
                 # But we don't know the threshold.
-
+                
                 # Let's assume if ALL atom mappings for this reaction needed fixing, then fix bonds too?
                 # Or check individually.
-
+                
                 # For safety, let's rely on validation downstream to catch it if we don't fix it.
                 # But to be helpful, let's try to swap if keys look "large" compared to values?
                 # Better yet: if we swapped atom mapping[i], swap bond mapping[i].
                 # But I didn't store that state.
-
+                
                 # Re-check atom mapping[i] state? No, I already swapped it.
                 # Let's just try to validate. If invalid, try swap.
                 pass
-
-            # Since I can't easily validate bond mapping without graph loaded,
-            # and I don't want to load graph twice, I'll defer bond fix.
+            
+            # Since I can't easily validate bond mapping without graph loaded, 
+            # and I don't want to load graph twice, I'll defer bond fix. 
             # If the user regenerated data with my other fix, it will be correct.
             # If they use old data, atom mapping fix is the most critical as that causes the assertion error.
             # Bond mapping errors usually result in poor training, not crash (unless index out of bounds).
-
+            
             # Actually, let's implement the Swap check if keys are > values significantly?
             # Or just if max_key is very large.
             pass
@@ -623,12 +623,10 @@ class BonDNetHDF5Dataset(Dataset):
             logger.warning(f"Skipping reaction {idx}: Atoms present ({num_atoms}) but no atom_mapping.")
             return None
 
-        # Check atom mapping indices
+        # Check atom mapping indices and coverage
         r_num_atoms = reactant_graph.num_nodes('atom')
         for i, mapping in enumerate(atom_mapping):
             # BondNet Requirement: p < len(mapping)
-            # This must be checked for ALL mappings, even if we don't have a corresponding product graph loaded yet
-            # (though in a valid reaction, len(atom_mapping) should match len(product_graphs))
             mapping_len = len(mapping)
             for p_idx, r_idx in mapping.items():
                 if p_idx >= mapping_len:
@@ -641,6 +639,12 @@ class BonDNetHDF5Dataset(Dataset):
             if i < len(product_graphs):
                 p_graph = product_graphs[i]
                 p_num_atoms = p_graph.num_nodes('atom')
+                
+                # Check strict coverage: mapping size must equal product atom count
+                # BondNet assertion: len(products_ft) == len(mappings[nt])
+                if len(mapping) != p_num_atoms:
+                    logger.warning(f"Skipping reaction {idx}: mapping length ({len(mapping)}) != product {i} atom count ({p_num_atoms})")
+                    return None
 
                 for p_idx, r_idx in mapping.items():
                     if p_idx >= p_num_atoms:
@@ -657,7 +661,7 @@ class BonDNetHDF5Dataset(Dataset):
             else:
                 # Valid case (no bonds), apply fix to prevent ValueError in bondnet
                 bond_mapping = [{}]
-
+        
         # Check bond mapping indices
         r_num_bonds = reactant_graph.num_nodes('bond')
         for i, mapping in enumerate(bond_mapping):
@@ -673,7 +677,7 @@ class BonDNetHDF5Dataset(Dataset):
             if i < len(product_graphs):
                 p_graph = product_graphs[i]
                 p_num_bonds = p_graph.num_nodes('bond')
-
+                
                 for p_idx, r_idx in mapping.items():
                     if p_idx >= p_num_bonds:
                         logger.warning(f"Skipping reaction {idx}: bond_mapping product index {p_idx} >= product {i} bonds {p_num_bonds}")
