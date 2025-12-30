@@ -68,8 +68,8 @@ def parse_bde_db2_csv(csv_file, max_molecules=0):
             'bond_index': int(row.get('bond_index', row.get('bond_idx', -1))),
             'fragment1': row.get('fragment1_smiles', row.get('fragment1', '')),
             'fragment2': row.get('fragment2_smiles', row.get('fragment2', '')),
-            'bde_enthalpy': float(row.get('bde_enthalpy', row.get('BDE_enth', 0.0))),
-            'bde_gibbs': float(row.get('bde_gibbs', row.get('BDE_gibbs', 0.0)))
+            'bde_enthalpy': float(row.get('bde_enthalpy', row.get('BDE_enth', row.get('bde', 0.0)))),
+            'bde_gibbs': float(row.get('bde_gibbs', row.get('BDE_gibbs', row.get('bdfe', 0.0))))
         }
 
         molecules[smiles].append(bde_entry)
