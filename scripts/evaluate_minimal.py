@@ -342,13 +342,16 @@ class ModelEvaluator:
             if 'smiles' not in entry:
                 continue
 
-            graph = graph_generator.smiles_to_graph(
-                smiles=entry['smiles'],
-                molecule_idx=i
-            )
+            try:
+                graph = graph_generator.smiles_to_graph(
+                    smiles=entry['smiles'],
+                    molecule_idx=i
+                )
 
-            if graph is not None:
-                graphs.append(graph)
+                if graph is not None:
+                    graphs.append(graph)
+            except ValueError:
+                continue
 
         if len(graphs) < 10:
             logger.warning("Not enough valid graphs for benchmarking")
