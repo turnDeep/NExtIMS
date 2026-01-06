@@ -11,39 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class BidirectionalModule(nn.Module):
-    """
-    Bidirectional Module (NEIMS-style)
-
-    Combines forward fragmentation prediction with backward neutral loss prediction.
-    """
-    def __init__(self, input_dim: int, output_dim: int = 501):
-        super().__init__()
-        self.forward_mlp = nn.Linear(input_dim, output_dim)
-        self.backward_mlp = nn.Linear(input_dim, output_dim)
-        self.alpha = nn.Parameter(torch.tensor(0.5))  # Learnable mixing coefficient
-
-    def forward(self, x):
-        """
-        Args:
-            x: Input features [batch_size, input_dim]
-
-        Returns:
-            spectrum: Combined spectrum [batch_size, output_dim]
-        """
-        # Forward: predict fragments
-        forward_pred = self.forward_mlp(x)
-
-        # Backward: predict neutral losses (flipped)
-        backward_pred = torch.flip(self.backward_mlp(x), dims=[-1])
-
-        # Combine with learnable weight
-        alpha = torch.sigmoid(self.alpha)
-        spectrum = alpha * forward_pred + (1 - alpha) * backward_pred
-
-        return spectrum
-
-
 class AttentionPooling(nn.Module):
     """
     Attention-based Graph Pooling
@@ -83,38 +50,6 @@ class AttentionPooling(nn.Module):
         pooled = global_add_pool(weighted_x, batch)
 
         return pooled
-
-
-class FeatureProjection(nn.Module):
-    """
-    Feature Projection for Knowledge Distillation
-
-    Projects Student features to Teacher feature space for alignment.
-    """
-    def __init__(self, student_dim: int = 6144, teacher_dim: int = 512):
-        super().__init__()
-        self.projection = nn.Sequential(
-            nn.Linear(student_dim, student_dim // 2),
-            nn.ReLU(),
-            nn.Linear(student_dim // 2, teacher_dim)
-        )
-
-        # Initialize weights with Xavier/Glorot uniform for stable gradients
-        for m in self.projection:
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight, gain=0.5)  # Reduced gain for stability
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-
-    def forward(self, student_features):
-        """
-        Args:
-            student_features: Student hidden features [batch_size, student_dim]
-
-        Returns:
-            projected: Projected features [batch_size, teacher_dim]
-        """
-        return self.projection(student_features)
 
 
 class SpectrumNormalizer(nn.Module):

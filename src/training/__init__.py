@@ -2,4 +2,3 @@
 """NEIMS v2.0 Training Components"""
 
 from .losses import *
-from .schedulers import *

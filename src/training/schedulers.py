@@ -11,65 +11,6 @@ import numpy as np
 from torch.optim.lr_scheduler import _LRScheduler
 
 
-class TemperatureScheduler:
-    """
-    Temperature Annealing Scheduler for Knowledge Distillation
-
-    Gradually decreases temperature from T_init to T_min over training.
-    """
-    def __init__(
-        self,
-        T_init: float = 4.0,
-        T_min: float = 1.0,
-        max_epochs: int = 150,
-        schedule: str = 'cosine'
-    ):
-        self.T_init = T_init
-        self.T_min = T_min
-        self.max_epochs = max_epochs
-        self.schedule = schedule
-
-    def get_temperature(self, epoch: int) -> float:
-        """
-        Get temperature for current epoch
-
-        Args:
-            epoch: Current epoch (0-indexed)
-
-        Returns:
-            temperature: Current temperature value
-        """
-        progress = epoch / self.max_epochs
-
-        if self.schedule == 'cosine':
-            # Cosine annealing
-            T = self.T_min + (self.T_init - self.T_min) * \
-                0.5 * (1 + np.cos(np.pi * progress))
-
-        elif self.schedule == 'linear':
-            # Linear decay
-            T = self.T_init - (self.T_init - self.T_min) * progress
-
-        elif self.schedule == 'exponential':
-            # Exponential decay
-            decay_rate = -np.log(self.T_min / self.T_init) / self.max_epochs
-            T = self.T_init * np.exp(-decay_rate * epoch)
-
-        elif self.schedule == 'step':
-            # Step decay (halve every 1/3 of training)
-            if progress < 1/3:
-                T = self.T_init
-            elif progress < 2/3:
-                T = (self.T_init + self.T_min) / 2
-            else:
-                T = self.T_min
-
-        else:
-            raise ValueError(f"Unknown schedule: {self.schedule}")
-
-        return max(T, self.T_min)
-
-
 class WarmupCosineScheduler(_LRScheduler):
     """
     Learning Rate Scheduler with Warmup and Cosine Annealing
