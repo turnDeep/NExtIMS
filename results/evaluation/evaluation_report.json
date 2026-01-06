@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-06T13:38:34.571960",
+  "timestamp": "2026-01-06T14:54:47.272760",
   "model_path": "models/qcgn2oei_minimal.pth",
   "model_config": {
     "node_dim": 16,
@@ -20,22 +20,22 @@
     "rmse": 0.040569596498034315,
     "mae": 0.004443690646439791,
     "spectral_angle_deg": 84.91258239746094,
-    "avg_inference_time_ms": 7.06326961517334,
+    "avg_inference_time_ms": 11.7828369140625,
     "total_samples": 10
   },
   "benchmark": {
     "batch_1": {
       "batch_size": 1,
-      "avg_time_sec": 0.012079834938049316,
-      "time_per_sample_ms": 12.079834938049316,
-      "throughput_samples_per_sec": 82.78258810061875,
+      "avg_time_sec": 0.027544069290161132,
+      "time_per_sample_ms": 27.544069290161133,
+      "throughput_samples_per_sec": 36.305456157024864,
       "avg_memory_mb": null
     },
     "batch_8": {
       "batch_size": 8,
-      "avg_time_sec": 0.022016525268554688,
-      "time_per_sample_ms": 2.752065658569336,
-      "throughput_samples_per_sec": 363.3634237200035,
+      "avg_time_sec": 0.0756993293762207,
+      "time_per_sample_ms": 9.462416172027588,
+      "throughput_samples_per_sec": 105.68125326765478,
       "avg_memory_mb": null
     }
   },
