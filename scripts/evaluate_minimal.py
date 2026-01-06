@@ -232,8 +232,7 @@ class ModelEvaluator:
                 spectrum = peaks_to_spectrum(
                     peaks,
                     min_mz=1,
-                    max_mz=1000,
-                    normalize=True
+                    max_mz=1000
                 )
 
                 # Generate graph
@@ -258,7 +257,12 @@ class ModelEvaluator:
             # Inference
             start_time = time.time()
             with torch.no_grad():
-                pred = self.model(batch_graph)
+                pred = self.model(
+                    x=batch_graph.x,
+                    edge_index=batch_graph.edge_index,
+                    edge_attr=batch_graph.edge_attr,
+                    batch=batch_graph.batch
+                )
             inference_time = time.time() - start_time
             inference_times.append(inference_time / len(graphs))  # Per-sample time
 
@@ -376,7 +380,12 @@ class ModelEvaluator:
                 # Inference
                 start = time.time()
                 with torch.no_grad():
-                    _ = self.model(batch)
+                    _ = self.model(
+                        x=batch.x,
+                        edge_index=batch.edge_index,
+                        edge_attr=batch.edge_attr,
+                        batch=batch.batch
+                    )
 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
