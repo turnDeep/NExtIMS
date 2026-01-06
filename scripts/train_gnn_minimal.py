@@ -59,6 +59,7 @@ class NISTGraphDataset(Dataset):
         self,
         msp_path: str,
         bde_cache_path: str = None,
+        bondnet_model: str = None,
         max_samples: int = 0,
         min_mz: int = 1,
         max_mz: int = 1000
@@ -67,6 +68,7 @@ class NISTGraphDataset(Dataset):
         Args:
             msp_path: Path to NIST MSP file
             bde_cache_path: Path to BDE HDF5 cache
+            bondnet_model: Path to BonDNet model (optional, for on-the-fly calculation)
             max_samples: Maximum samples to load (0 = all)
             min_mz: Minimum m/z (default: 1)
             max_mz: Maximum m/z (default: 1000)
@@ -77,7 +79,8 @@ class NISTGraphDataset(Dataset):
         # Initialize graph generator
         self.graph_gen = MinimalGraphGenerator(
             bde_cache_path=bde_cache_path,
-            use_bde_calculator=False,  # Use cache only for speed
+            use_bde_calculator=(bondnet_model is not None),
+            bondnet_model=bondnet_model,
             default_bde=85.0
         )
 
@@ -252,6 +255,8 @@ def main():
                         help='Path to NIST MSP file')
     parser.add_argument('--bde-cache', type=str, default=None,
                         help='Path to BDE HDF5 cache')
+    parser.add_argument('--bondnet-model', type=str, default=None,
+                        help='Path to BonDNet model for on-the-fly BDE calculation')
     parser.add_argument('--output', type=str, default='models/qcgn2oei_minimal.pth',
                         help='Output model path')
     parser.add_argument('--epochs', type=int, default=200,
@@ -297,6 +302,7 @@ def main():
     dataset = NISTGraphDataset(
         msp_path=args.nist_msp,
         bde_cache_path=args.bde_cache,
+        bondnet_model=args.bondnet_model,
         max_samples=args.max_samples
     )
 
