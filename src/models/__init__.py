@@ -3,14 +3,8 @@
 Model Definition Module
 """
 
-# from .gcn_model import GCNMassSpecPredictor
-# from .graph_transformer import GraphTransformerPredictor
-# from .baseline import BaselinePredictor
-from .teacher import TeacherModel
-from .student import StudentModel
+from .qcgn2oei_minimal import QCGN2oEI_Minimal
 
 __all__ = [
-    # "GCNMassSpecPredictor",
-    "TeacherModel",
-    "StudentModel"
+    "QCGN2oEI_Minimal"
 ]

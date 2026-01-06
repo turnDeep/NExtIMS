@@ -357,22 +357,20 @@ Phase 3: 評価
 ```yaml
 # モデル設定（最小構成）
 model:
-  teacher:
-    gnn:
-      num_layers: 10         # GATv2Conv層数
-      hidden_dim: 256        # 隠れ層次元
-      node_features: 16      # ノード特徴次元
-      edge_features: 3       # エッジ特徴次元
-      dropout: 0.1
+  gnn:
+    num_layers: 10         # GATv2Conv層数
+    hidden_dim: 256        # 隠れ層次元
+    node_features: 16      # ノード特徴次元
+    edge_features: 3       # エッジ特徴次元
+    dropout: 0.1
 
 # 学習設定
 training:
-  teacher_multitask:
-    batch_size: 32           # バッチサイズ（RTX 5070 Ti最適化）
-    num_epochs: 200
-    learning_rate: 5.0e-5    # RAdam学習率
-    optimizer: "RAdam"
-    scheduler: "CosineAnnealingLR"
+  batch_size: 32           # バッチサイズ（RTX 5070 Ti最適化）
+  num_epochs: 200
+  learning_rate: 5.0e-5    # RAdam学習率
+  optimizer: "RAdam"
+  scheduler: "CosineAnnealingLR"
 
 # GPU設定（RTX 5070 Ti）
 gpu:

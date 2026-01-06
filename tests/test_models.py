@@ -101,7 +101,12 @@ def test_forward_pass_shapes():
         graph = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, batch=batch)
 
         with torch.no_grad():
-            output = model(graph)
+            output = model(
+                x=graph.x,
+                edge_index=graph.edge_index,
+                edge_attr=graph.edge_attr,
+                batch=graph.batch
+            )
 
         assert output.shape == (1, 1000), f"Expected (1, 1000), got {output.shape}"
         print(f"✅ Single graph: input={num_nodes} nodes, output={output.shape}")
@@ -121,7 +126,12 @@ def test_forward_pass_shapes():
         batch_graph = Batch.from_data_list(graphs)
 
         with torch.no_grad():
-            output_batch = model(batch_graph)
+            output_batch = model(
+                x=batch_graph.x,
+                edge_index=batch_graph.edge_index,
+                edge_attr=batch_graph.edge_attr,
+                batch=batch_graph.batch
+            )
 
         assert output_batch.shape == (5, 1000), \
             f"Expected (5, 1000), got {output_batch.shape}"
@@ -200,7 +210,12 @@ def test_device_placement():
             graph = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, batch=batch)
 
             with torch.no_grad():
-                output = model_cuda(graph)
+                output = model_cuda(
+                    x=graph.x,
+                    edge_index=graph.edge_index,
+                    edge_attr=graph.edge_attr,
+                    batch=graph.batch
+                )
 
             assert output.device.type == 'cuda'
             print(f"✅ Forward pass on CUDA successful")
