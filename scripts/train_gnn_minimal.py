@@ -135,18 +135,24 @@ class NISTGraphDataset(Dataset):
         item = self.data[idx]
 
         # Generate graph
-        graph = self.graph_gen.mol_to_graph(
-            mol=item['mol'],
-            smiles=item['smiles'],
-            spectrum=item['spectrum'],
-            compound_name=item['name']
-        )
-
-        return graph
+        try:
+            graph = self.graph_gen.mol_to_graph(
+                mol=item['mol'],
+                smiles=item['smiles'],
+                spectrum=item['spectrum'],
+                compound_name=item['name']
+            )
+            return graph
+        except ValueError:
+            return None
 
 
 def collate_pyg_graphs(batch_list):
     """Collate PyG graphs into a batch"""
+    # Filter out None items (invalid graphs)
+    batch_list = [item for item in batch_list if item is not None]
+    if len(batch_list) == 0:
+        return None
     return Batch.from_data_list(batch_list)
 
 
@@ -167,6 +173,9 @@ def train_epoch(
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
 
     for batch in pbar:
+        if batch is None:
+            continue
+
         batch = batch.to(device)
 
         # Forward pass
@@ -221,6 +230,9 @@ def evaluate(
     num_batches = 0
 
     for batch in tqdm(dataloader, desc="Evaluating"):
+        if batch is None:
+            continue
+
         batch = batch.to(device)
 
         # Forward pass
