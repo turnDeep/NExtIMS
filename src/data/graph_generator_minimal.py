@@ -245,7 +245,7 @@ class MinimalGraphGenerator:
 
         # Add target spectrum
         if spectrum is not None:
-            data.y = torch.tensor(spectrum, dtype=torch.float32)
+            data.y = torch.tensor(spectrum, dtype=torch.float32).unsqueeze(0)
 
         # Add metadata
         data.smiles = smiles

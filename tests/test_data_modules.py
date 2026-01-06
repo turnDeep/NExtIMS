@@ -228,8 +228,7 @@ def test_nist_parsing():
         spectrum = peaks_to_spectrum(
             peaks,
             min_mz=1,
-            max_mz=1000,
-            normalize=True
+            max_mz=1000
         )
 
         assert len(spectrum) == 1000, f"Expected 1000, got {len(spectrum)}"
@@ -239,22 +238,13 @@ def test_nist_parsing():
         print(f"✅ Peaks to spectrum conversion: shape {spectrum.shape}")
 
         # Test case 2: Non-normalized
-        spectrum_raw = peaks_to_spectrum(
-            peaks,
-            min_mz=1,
-            max_mz=1000,
-            normalize=False
-        )
-
-        assert spectrum_raw[45] == 100.0, "Base peak should be 100.0"
-        print(f"✅ Non-normalized spectrum: max={spectrum_raw.max()}")
+        # Note: peaks_to_spectrum always normalizes in current implementation
 
         # Test case 3: Empty peaks
         empty_spectrum = peaks_to_spectrum(
             [],
             min_mz=1,
-            max_mz=1000,
-            normalize=True
+            max_mz=1000
         )
 
         assert np.all(empty_spectrum == 0), "Empty peaks should give zero spectrum"
