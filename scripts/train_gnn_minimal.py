@@ -229,7 +229,9 @@ def evaluate(
     total_cosine_sim = 0
     num_batches = 0
 
-    for batch in tqdm(dataloader, desc="Evaluating"):
+    pbar = tqdm(dataloader, desc="Evaluating")
+
+    for batch in pbar:
         if batch is None:
             continue
 
@@ -251,9 +253,15 @@ def evaluate(
         total_cosine_sim += cosine_sim
         num_batches += 1
 
+        # Update progress bar
+        pbar.set_postfix({
+            'loss': f"{loss.item():.4f}",
+            'cos_sim': f"{cosine_sim:.4f}"
+        })
+
     metrics = {
-        'loss': total_loss / num_batches,
-        'cosine_sim': total_cosine_sim / num_batches
+        'loss': total_loss / num_batches if num_batches > 0 else 0.0,
+        'cosine_sim': total_cosine_sim / num_batches if num_batches > 0 else 0.0
     }
 
     return metrics
