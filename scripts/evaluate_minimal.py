@@ -49,6 +49,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from rdkit import RDLogger
+
+# Suppress RDKit errors
+RDLogger.DisableLog('rdApp.*')
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -236,15 +240,18 @@ class ModelEvaluator:
                 )
 
                 # Generate graph
-                graph = graph_generator.smiles_to_graph(
-                    smiles=smiles,
-                    molecule_idx=i + len(graphs)  # Dummy index
-                )
+                try:
+                    graph = graph_generator.smiles_to_graph(
+                        smiles=smiles,
+                        molecule_idx=i + len(graphs)  # Dummy index
+                    )
 
-                if graph is not None:
-                    graphs.append(graph)
-                    targets.append(spectrum)
-                    smiles_list.append(smiles)
+                    if graph is not None:
+                        graphs.append(graph)
+                        targets.append(spectrum)
+                        smiles_list.append(smiles)
+                except ValueError:
+                    continue
 
             if len(graphs) == 0:
                 continue
