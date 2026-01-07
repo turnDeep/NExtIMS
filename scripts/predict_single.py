@@ -177,7 +177,12 @@ def predict_spectrum(
 
     start_time = time.time()
     with torch.no_grad():
-        spectrum_pred = model(graph)
+        spectrum_pred = model(
+            graph.x,
+            graph.edge_index,
+            graph.edge_attr,
+            graph.batch
+        )
     inference_time = time.time() - start_time
 
     spectrum = spectrum_pred.cpu().numpy().squeeze()
