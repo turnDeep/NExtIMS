@@ -56,8 +56,8 @@ class QCGN2oEI_Minimal(nn.Module):
 
     def __init__(
         self,
-        node_dim: int = 16,
-        edge_dim: int = 3,
+        node_dim: int = 30,
+        edge_dim: int = 4,
         hidden_dim: int = 256,
         num_layers: int = 10,
         num_heads: int = 8,
@@ -69,8 +69,8 @@ class QCGN2oEI_Minimal(nn.Module):
         Initialize QCGN2oEI_Minimal model
 
         Args:
-            node_dim: Node feature dimension (default: 16)
-            edge_dim: Edge feature dimension (default: 3)
+            node_dim: Node feature dimension (default: 30)
+            edge_dim: Edge feature dimension (default: 4)
             hidden_dim: Hidden dimension (default: 256)
             num_layers: Number of GATv2 layers (default: 10)
             num_heads: Number of attention heads (default: 8)
@@ -258,8 +258,8 @@ if __name__ == "__main__":
 
     # Create model
     model = QCGN2oEI_Minimal(
-        node_dim=16,
-        edge_dim=3,
+        node_dim=30,
+        edge_dim=4,
         hidden_dim=256,
         num_layers=10,
         num_heads=8,
@@ -285,12 +285,12 @@ if __name__ == "__main__":
     num_nodes = 6
     num_edges = 12  # Bidirectional
 
-    x = torch.randn(num_nodes, 16)  # Node features
+    x = torch.randn(num_nodes, 30)  # Node features
     edge_index = torch.tensor([
         [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 0],
         [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 0, 5]
     ], dtype=torch.long)
-    edge_attr = torch.randn(num_edges, 3)  # Edge features
+    edge_attr = torch.randn(num_edges, 4)  # Edge features
 
     # Single graph
     print("\nSingle graph:")
