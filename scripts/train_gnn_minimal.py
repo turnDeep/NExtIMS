@@ -348,8 +348,8 @@ def main():
 
     # Create model
     model = QCGN2oEI_Minimal(
-        node_dim=16,
-        edge_dim=3,
+        node_dim=30,
+        edge_dim=4,
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         num_heads=args.num_heads,
