@@ -202,10 +202,14 @@ def train_epoch(
         total_cosine_sim += cosine_sim
         num_batches += 1
 
+        # Calculate running averages
+        avg_loss = total_loss / num_batches
+        avg_cos_sim = total_cosine_sim / num_batches
+
         # Update progress bar
         pbar.set_postfix({
-            'loss': f"{loss.item():.4f}",
-            'cos_sim': f"{cosine_sim:.4f}"
+            'loss': f"{avg_loss:.4f}",
+            'cos_sim': f"{avg_cos_sim:.4f}"
         })
 
     metrics = {
@@ -229,7 +233,8 @@ def evaluate(
     total_cosine_sim = 0
     num_batches = 0
 
-    for batch in tqdm(dataloader, desc="Evaluating"):
+    pbar = tqdm(dataloader, desc="Evaluating")
+    for batch in pbar:
         if batch is None:
             continue
 
@@ -250,6 +255,16 @@ def evaluate(
         total_loss += loss.item()
         total_cosine_sim += cosine_sim
         num_batches += 1
+
+        # Calculate running averages
+        avg_loss = total_loss / num_batches
+        avg_cos_sim = total_cosine_sim / num_batches
+
+        # Update progress bar
+        pbar.set_postfix({
+            'loss': f"{avg_loss:.4f}",
+            'cos_sim': f"{avg_cos_sim:.4f}"
+        })
 
     metrics = {
         'loss': total_loss / num_batches,
