@@ -105,17 +105,26 @@ class BatchPredictor:
 
         # Load model
         logger.info(f"Loading model from {model_path}")
+        checkpoint = torch.load(model_path, map_location=self.device)
+
+        # Load model args from checkpoint if available
+        ckpt_args = checkpoint.get('args', {})
+        node_dim = ckpt_args.get('node_dim', 30)
+        edge_dim = ckpt_args.get('edge_dim', 4)
+        hidden_dim = ckpt_args.get('hidden_dim', 256)
+        num_layers = ckpt_args.get('num_layers', 10)
+        num_heads = ckpt_args.get('num_heads', 8)
+
         self.model = QCGN2oEI_Minimal(
-            node_dim=16,
-            edge_dim=3,
-            hidden_dim=256,
-            num_layers=10,
-            num_heads=8,
+            node_dim=node_dim,
+            edge_dim=edge_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
             output_dim=self.output_dim,
             dropout=0.1
         )
 
-        checkpoint = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.model.to(self.device)
         self.model.eval()
