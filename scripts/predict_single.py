@@ -153,17 +153,26 @@ def predict_spectrum(
     logger.info("Loading trained model...")
     device = torch.device(device if torch.cuda.is_available() else "cpu")
 
+    checkpoint = torch.load(model_path, map_location=device)
+
+    # Load model args from checkpoint if available
+    ckpt_args = checkpoint.get('args', {})
+    node_dim = ckpt_args.get('node_dim', 30)
+    edge_dim = ckpt_args.get('edge_dim', 4)
+    hidden_dim = ckpt_args.get('hidden_dim', 256)
+    num_layers = ckpt_args.get('num_layers', 10)
+    num_heads = ckpt_args.get('num_heads', 8)
+
     model = QCGN2oEI_Minimal(
-        node_dim=16,
-        edge_dim=3,
-        hidden_dim=256,
-        num_layers=10,
-        num_heads=8,
+        node_dim=node_dim,
+        edge_dim=edge_dim,
+        hidden_dim=hidden_dim,
+        num_layers=num_layers,
+        num_heads=num_heads,
         output_dim=max_mz - min_mz + 1,
         dropout=0.1
     )
 
-    checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
