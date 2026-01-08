@@ -77,8 +77,8 @@ class ModelEvaluator:
         self,
         model_path: str,
         device: str = "cuda",
-        node_dim: int = 16,
-        edge_dim: int = 3,
+        node_dim: int = 30,
+        edge_dim: int = 4,
         hidden_dim: int = 256,
         num_layers: int = 10,
         num_heads: int = 8,
@@ -103,6 +103,19 @@ class ModelEvaluator:
         # Load model
         logger.info(f"Loading model from {model_path}")
         checkpoint = torch.load(model_path, map_location=self.device)
+
+        # Load args from checkpoint if available
+        ckpt_args = checkpoint.get('args', {})
+        if 'node_dim' in ckpt_args:
+             node_dim = ckpt_args['node_dim']
+        if 'edge_dim' in ckpt_args:
+             edge_dim = ckpt_args['edge_dim']
+        if 'hidden_dim' in ckpt_args:
+             hidden_dim = ckpt_args['hidden_dim']
+        if 'num_layers' in ckpt_args:
+             num_layers = ckpt_args['num_layers']
+        if 'num_heads' in ckpt_args:
+             num_heads = ckpt_args['num_heads']
 
         self.model = QCGN2oEI_Minimal(
             node_dim=node_dim,
