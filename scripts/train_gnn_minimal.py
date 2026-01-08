@@ -277,12 +277,12 @@ def main():
                         help='Batch size (default: 32 for RTX 5070 Ti)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
-    parser.add_argument('--hidden-dim', type=int, default=256,
-                        help='Hidden dimension (default: 256)')
-    parser.add_argument('--num-layers', type=int, default=10,
-                        help='Number of GATv2 layers (default: 10)')
-    parser.add_argument('--num-heads', type=int, default=8,
-                        help='Number of attention heads (default: 8)')
+    parser.add_argument('--hidden-dim', type=int, default=512,
+                        help='Hidden dimension (default: 512)')
+    parser.add_argument('--num-layers', type=int, default=12,
+                        help='Number of GATv2 layers (default: 12)')
+    parser.add_argument('--num-heads', type=int, default=16,
+                        help='Number of attention heads (default: 16)')
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='Dropout rate (default: 0.1)')
     parser.add_argument('--max-samples', type=int, default=0,
@@ -348,8 +348,8 @@ def main():
 
     # Create model
     model = QCGN2oEI_Minimal(
-        node_dim=30,
-        edge_dim=4,
+        node_dim=34,
+        edge_dim=10,
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         num_heads=args.num_heads,

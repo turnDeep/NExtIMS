@@ -77,11 +77,11 @@ class ModelEvaluator:
         self,
         model_path: str,
         device: str = "cuda",
-        node_dim: int = 30,
-        edge_dim: int = 4,
-        hidden_dim: int = 256,
-        num_layers: int = 10,
-        num_heads: int = 8,
+        node_dim: int = 34,
+        edge_dim: int = 10,
+        hidden_dim: int = 512,
+        num_layers: int = 12,
+        num_heads: int = 16,
         output_dim: int = 1000
     ):
         """
