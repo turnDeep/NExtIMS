@@ -41,39 +41,39 @@ class QCGN2oEI_Minimal(nn.Module):
     Minimal Graph Neural Network for EI-MS Prediction
 
     QC-GN2oMS2-inspired architecture adapted for EI-MS:
-    - Input: 16-dim node features, 3-dim edge features
-    - GNN: 10-layer GATv2Conv with residual connections
+    - Input: 34-dim node features, 10-dim edge features
+    - GNN: 16-layer GATv2Conv with residual connections
     - Pooling: Global mean pooling
     - Output: 1000-dim spectrum (m/z 1-1000)
 
     Key Differences from QC-GN2oMS2:
     - Task: MS/MS → EI-MS
-    - Node features: 16-dim (same as QC-GN2oMS2)
-    - Edge features: 2-dim (QC-GN2oMS2) → 3-dim (adds BDE)
+    - Node features: 34-dim (Stereochemistry enhanced)
+    - Edge features: 10-dim (BDE + Stereo enhanced)
     - Output: Variable m/z → Fixed m/z 1-1000
-    - Hidden dim: 128 (QC-GN2oMS2) → 256 (v4.2, better capacity)
+    - Hidden dim: 1024 (v5.0 Large Scale)
     """
 
     def __init__(
         self,
         node_dim: int = 34,
         edge_dim: int = 10,
-        hidden_dim: int = 512,
-        num_layers: int = 12,
-        num_heads: int = 16,
+        hidden_dim: int = 1024,
+        num_layers: int = 16,
+        num_heads: int = 32,
         output_dim: int = 1000,
         dropout: float = 0.1,
         use_edge_attr: bool = True
     ):
         """
-        Initialize QCGN2oEI_Minimal model (v4.4 Scaled)
+        Initialize QCGN2oEI_Minimal model (v5.0 Large Scale)
 
         Args:
-            node_dim: Node feature dimension (default: 34 for v4.4)
-            edge_dim: Edge feature dimension (default: 10 for v4.4)
-            hidden_dim: Hidden dimension (default: 512)
-            num_layers: Number of GATv2 layers (default: 12)
-            num_heads: Number of attention heads (default: 16)
+            node_dim: Node feature dimension (default: 34 for v4.4+)
+            edge_dim: Edge feature dimension (default: 10 for v4.4+)
+            hidden_dim: Hidden dimension (default: 1024)
+            num_layers: Number of GATv2 layers (default: 16)
+            num_heads: Number of attention heads (default: 32)
             output_dim: Output spectrum dimension (default: 1000 for m/z 1-1000)
             dropout: Dropout rate (default: 0.1)
             use_edge_attr: Whether to use edge attributes (default: True)
@@ -260,9 +260,9 @@ if __name__ == "__main__":
     model = QCGN2oEI_Minimal(
         node_dim=34,
         edge_dim=10,
-        hidden_dim=512,
-        num_layers=12,
-        num_heads=16,
+        hidden_dim=1024,
+        num_layers=16,
+        num_heads=32,
         output_dim=1000,
         dropout=0.1
     )
