@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # src/data/features_qcgn.py
 """
-NExtIMS v4.3: Enhanced Feature Extractor
+NExtIMS v4.4: Stereochemistry & Scaled Architecture
 
-Implements enhanced node and edge features:
-- Node features (30 dims):
+Implements enhanced node and edge features with Stereochemistry:
+- Node features (34 dims):
     - 15 atom types (one-hot)
     - 6 hybridization types (one-hot)
     - 1 aromaticity (bool)
@@ -12,19 +12,17 @@ Implements enhanced node and edge features:
     - 1 formal charge (integer)
     - 1 radical electrons (integer)
     - 1 in ring (bool)
-- Edge features (4 dims):
-    - bond_order (float)
-    - BDE (normalized)
-    - in_ring (bool)
-    - is_conjugated (bool)
-
-This replaces the v4.2 minimal approach by restoring critical RDKit features
-required for EI-MS prediction while maintaining efficiency.
+    - 4 chiral tag (one-hot) [NEW]
+- Edge features (10 dims):
+    - 1 bond_order (float)
+    - 1 BDE (normalized)
+    - 1 in_ring (bool)
+    - 1 is_conjugated (bool)
+    - 6 bond stereo (one-hot) [NEW]
 
 Design Philosophy:
-- Restore chemical context (hybridization, charge, aromaticity) missing in Minimal
-- Remove useless features (fixed ionization energy)
-- Enhance edge features with conjugation info
+- Incorporate chirality and cis/trans isomerism (critical for mass spec differentiation)
+- Prepare features for scaled-up model architecture
 """
 
 import numpy as np
@@ -38,9 +36,9 @@ logger = logging.getLogger(__name__)
 
 class QCGNFeaturizer:
     """
-    Enhanced molecular featurizer for v4.3
+    Enhanced molecular featurizer for v4.4 (Stereochemistry)
 
-    Node Features (30-dim):
+    Node Features (34-dim):
         - [0-14] 15 atom types (one-hot via mass matching)
         - [15-20] 6 hybridization types (S, SP, SP2, SP3, SP3D, SP3D2)
         - [21] Is Aromatic (bool)
@@ -48,18 +46,18 @@ class QCGNFeaturizer:
         - [27] Formal Charge (integer)
         - [28] Radical Electrons (integer)
         - [29] In Ring (bool)
+        - [30-33] Chiral Tag (one-hot: Unspecified, CW, CCW, Other)
 
-    Edge Features (4-dim):
+    Edge Features (10-dim):
         - [0] bond_order: 1.0 (single), 2.0 (double), 3.0 (triple), 1.5 (aromatic)
         - [1] BDE: Bond Dissociation Energy (kcal/mol), normalized [0, 1]
         - [2] in_ring: Binary indicator
         - [3] is_conjugated: Binary indicator
+        - [4-9] Bond Stereo (one-hot: None, Any, Z, E, Cis, Trans)
 
-    Key Differences from v4.2 Minimal:
-        - Node: 16-dim → 30-dim
-        - Edge: 3-dim → 4-dim
-        - Removes: Fixed ionization energy (70eV)
-        - Adds: Hybridization, Aromaticity, Num Hs, Charge, Radicals, Conjugation
+    Key Differences from v4.3:
+        - Node: 30-dim → 34-dim (Adds Chirality)
+        - Edge: 4-dim → 10-dim (Adds Bond Stereo)
     """
 
     # Atom masses for one-hot encoding
@@ -91,6 +89,24 @@ class QCGNFeaturizer:
         Chem.rdchem.HybridizationType.SP3D2
     ]
 
+    # Chiral Tags
+    CHIRAL_TAGS = [
+        Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
+        Chem.rdchem.ChiralType.CHI_OTHER
+    ]
+
+    # Bond Stereo
+    BOND_STEREO = [
+        Chem.rdchem.BondStereo.STEREONONE,
+        Chem.rdchem.BondStereo.STEREOANY,
+        Chem.rdchem.BondStereo.STEREOZ,
+        Chem.rdchem.BondStereo.STEREOE,
+        Chem.rdchem.BondStereo.STEREOCIS,
+        Chem.rdchem.BondStereo.STEREOTRANS
+    ]
+
     # BDE normalization range (kcal/mol)
     BDE_MIN = 50.0
     BDE_MAX = 200.0
@@ -114,22 +130,22 @@ class QCGNFeaturizer:
         self.bde_max = bde_max
 
         # Calculate dimensions
-        self.node_dim = 30
-        self.edge_dim = 4
+        self.node_dim = 34
+        self.edge_dim = 10
 
-        logger.info("QCGNFeaturizer (Enhanced) initialized:")
-        logger.info(f"  Node features: {self.node_dim}-dim (Atoms + Hyb + Aro + Hs + Chg + Rad + Ring)")
-        logger.info(f"  Edge features: {self.edge_dim}-dim (Order + BDE + Ring + Conj)")
+        logger.info("QCGNFeaturizer (v4.4 Stereochemistry) initialized:")
+        logger.info(f"  Node features: {self.node_dim}-dim (+Chirality)")
+        logger.info(f"  Edge features: {self.edge_dim}-dim (+Stereo)")
 
     def get_atom_features(self, atom: Chem.Atom) -> np.ndarray:
         """
-        Get enhanced node features (30-dim)
+        Get enhanced node features (34-dim)
 
         Args:
             atom: RDKit Atom object
 
         Returns:
-            features: [30] numpy array
+            features: [34] numpy array
         """
         features = np.zeros(self.node_dim, dtype=np.float32)
         offset = 0
@@ -149,7 +165,6 @@ class QCGNFeaturizer:
             hyb_idx = self.HYBRIDIZATIONS.index(hyb)
             features[offset + hyb_idx] = 1.0
         except ValueError:
-            # UNSPECIFIED or OTHER -> All zeros
             pass
         offset += 6
 
@@ -175,6 +190,15 @@ class QCGNFeaturizer:
         features[offset] = 1.0 if atom.IsInRing() else 0.0
         offset += 1
 
+        # 8. Chiral Tag (4-dim one-hot) [NEW]
+        chi = atom.GetChiralTag()
+        try:
+            chi_idx = self.CHIRAL_TAGS.index(chi)
+            features[offset + chi_idx] = 1.0
+        except ValueError:
+            pass # Should not happen if list is complete
+        offset += 4
+
         return features
 
     def get_edge_features(
@@ -183,15 +207,14 @@ class QCGNFeaturizer:
         bde_value: Optional[float] = None
     ) -> np.ndarray:
         """
-        Get enhanced edge features (4-dim)
+        Get enhanced edge features (10-dim)
 
         Args:
             bond: RDKit Bond object
             bde_value: BDE value in kcal/mol (optional)
 
         Returns:
-            features: [4] numpy array
-                [bond_order, BDE_normalized, in_ring, is_conjugated]
+            features: [10] numpy array
         """
         features = np.zeros(self.edge_dim, dtype=np.float32)
 
@@ -216,6 +239,14 @@ class QCGNFeaturizer:
 
         # 4. Is Conjugated
         features[3] = float(bond.GetIsConjugated())
+
+        # 5. Bond Stereo (6-dim one-hot) [NEW]
+        stereo = bond.GetStereo()
+        try:
+            stereo_idx = self.BOND_STEREO.index(stereo)
+            features[4 + stereo_idx] = 1.0
+        except ValueError:
+            pass
 
         return features
 
@@ -261,7 +292,7 @@ class QCGNFeaturizer:
             ],
             'use_bde': self.use_bde,
             'bde_range_kcal_mol': (self.bde_min, self.bde_max),
-            'edge_features': ['bond_order', 'BDE_normalized', 'in_ring', 'is_conjugated']
+            'edge_features': ['bond_order', 'BDE_normalized', 'in_ring', 'is_conjugated', 'bond_stereo']
         }
 
 
@@ -276,7 +307,7 @@ if __name__ == "__main__":
     # Print feature info
     info = featurizer.get_feature_info()
     print("\n" + "="*60)
-    print("QC-GN Enhanced Featurizer Information")
+    print("QC-GN Enhanced Featurizer (v4.4) Information")
     print("="*60)
     print(f"Node dimension: {info['node_dim']}")
     print(f"Edge dimension: {info['edge_dim']}")
@@ -285,9 +316,9 @@ if __name__ == "__main__":
 
     # Test molecules
     test_smiles = [
-        ("c1ccccc1", "Benzene"),
-        ("CC(=O)O", "Acetic acid"),
-        ("C=CC=C", "1,3-Butadiene"),
+        ("C[C@H](O)C(=O)O", "L-Lactic Acid (Chiral)"),
+        ("C/C=C/C", "Trans-2-Butene"),
+        ("C/C=C\C", "Cis-2-Butene"),
     ]
 
     print("\n" + "="*60)
@@ -305,14 +336,19 @@ if __name__ == "__main__":
         print(f"  Atoms: {mol.GetNumAtoms()}")
         for i, atom in enumerate(mol.GetAtoms()):
             features = featurizer.get_atom_features(atom)
-            # Print non-zero features summary
-            print(f"    Atom {i} ({atom.GetSymbol()}): {features.shape} - Sum: {features.sum()}")
+            # Check chiral feature (last 4 dims)
+            chiral_vec = features[-4:]
+            if chiral_vec.sum() > 0:
+                print(f"    Atom {i} ({atom.GetSymbol()}): Chiral={chiral_vec}")
 
         # Edge features
         print(f"  Bonds: {mol.GetNumBonds()}")
         for i, bond in enumerate(mol.GetBonds()):
             features = featurizer.get_edge_features(bond, bde_value=85.0)
-            print(f"    Bond {i}: Order={features[0]}, Conj={features[3]}")
+            # Check stereo feature (last 6 dims)
+            stereo_vec = features[-6:]
+            if stereo_vec[0] == 0: # If not STEREONONE
+                 print(f"    Bond {i}: Stereo={stereo_vec}")
 
     print("\n" + "="*60)
     print("Test Complete!")

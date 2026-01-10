@@ -157,11 +157,11 @@ def predict_spectrum(
 
     # Load model args from checkpoint if available
     ckpt_args = checkpoint.get('args', {})
-    node_dim = ckpt_args.get('node_dim', 30)
-    edge_dim = ckpt_args.get('edge_dim', 4)
-    hidden_dim = ckpt_args.get('hidden_dim', 256)
-    num_layers = ckpt_args.get('num_layers', 10)
-    num_heads = ckpt_args.get('num_heads', 8)
+    node_dim = ckpt_args.get('node_dim', 34)
+    edge_dim = ckpt_args.get('edge_dim', 10)
+    hidden_dim = ckpt_args.get('hidden_dim', 512)
+    num_layers = ckpt_args.get('num_layers', 12)
+    num_heads = ckpt_args.get('num_heads', 16)
 
     model = QCGN2oEI_Minimal(
         node_dim=node_dim,
