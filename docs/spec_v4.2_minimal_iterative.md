@@ -1144,7 +1144,12 @@ def predict_spectrum(
     graph = graph.to(device)
 
     with torch.no_grad():
-        spectrum_pred = model(graph)
+        spectrum_pred = model(
+            x=graph.x,
+            edge_index=graph.edge_index,
+            edge_attr=graph.edge_attr,
+            batch=graph.batch
+        )
 
     spectrum = spectrum_pred.cpu().numpy().squeeze()
 

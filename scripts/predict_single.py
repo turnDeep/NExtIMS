@@ -186,11 +186,12 @@ def predict_spectrum(
 
     start_time = time.time()
     with torch.no_grad():
+        # Explicitly unpack arguments to prevent TypeError in older model versions
         spectrum_pred = model(
-            graph.x,
-            graph.edge_index,
-            graph.edge_attr,
-            graph.batch
+            x=graph.x,
+            edge_index=graph.edge_index,
+            edge_attr=graph.edge_attr,
+            batch=graph.batch
         )
     inference_time = time.time() - start_time
 
