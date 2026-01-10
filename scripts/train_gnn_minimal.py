@@ -289,15 +289,15 @@ def main():
     parser.add_argument('--epochs', type=int, default=200,
                         help='Number of epochs (default: 200)')
     parser.add_argument('--batch-size', type=int, default=16,
-                        help='Batch size (default: 16 for Large Model)')
+                        help='Batch size (default: 16 for Medium-Large Model)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
-    parser.add_argument('--hidden-dim', type=int, default=1024,
-                        help='Hidden dimension (default: 1024)')
-    parser.add_argument('--num-layers', type=int, default=16,
-                        help='Number of GATv2 layers (default: 16)')
-    parser.add_argument('--num-heads', type=int, default=32,
-                        help='Number of attention heads (default: 32)')
+    parser.add_argument('--hidden-dim', type=int, default=768,
+                        help='Hidden dimension (default: 768)')
+    parser.add_argument('--num-layers', type=int, default=14,
+                        help='Number of GATv2 layers (default: 14)')
+    parser.add_argument('--num-heads', type=int, default=24,
+                        help='Number of attention heads (default: 24)')
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='Dropout rate (default: 0.1)')
     parser.add_argument('--max-samples', type=int, default=0,
@@ -362,6 +362,9 @@ def main():
     )
 
     # Create model
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     model = QCGN2oEI_Minimal(
         node_dim=34,
         edge_dim=10,
