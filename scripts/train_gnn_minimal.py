@@ -22,6 +22,9 @@ import sys
 import argparse
 import logging
 from pathlib import Path
+
+# Enable expandable segments to avoid memory fragmentation
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import time
 from typing import Dict, List
 
@@ -288,8 +291,8 @@ def main():
                         help='Output model path')
     parser.add_argument('--epochs', type=int, default=200,
                         help='Number of epochs (default: 200)')
-    parser.add_argument('--batch-size', type=int, default=16,
-                        help='Batch size (default: 16 for Medium-Large Model)')
+    parser.add_argument('--batch-size', type=int, default=8,
+                        help='Batch size (default: 8 to prevent OOM)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
     parser.add_argument('--hidden-dim', type=int, default=768,
@@ -300,6 +303,8 @@ def main():
                         help='Number of attention heads (default: 24)')
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='Dropout rate (default: 0.1)')
+    parser.add_argument('--gradient-checkpointing', action='store_true', default=True,
+                        help='Enable gradient checkpointing (default: True)')
     parser.add_argument('--max-samples', type=int, default=0,
                         help='Max samples to use (0 = all)')
     parser.add_argument('--val-split', type=float, default=0.1,
@@ -372,7 +377,8 @@ def main():
         num_layers=args.num_layers,
         num_heads=args.num_heads,
         output_dim=1000,
-        dropout=args.dropout
+        dropout=args.dropout,
+        gradient_checkpointing=args.gradient_checkpointing
     ).to(args.device)
 
     # Optimizer: RAdam

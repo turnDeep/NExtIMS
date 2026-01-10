@@ -30,6 +30,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GATv2Conv, global_mean_pool
+from torch.utils.checkpoint import checkpoint
 from typing import Optional
 import logging
 
@@ -63,7 +64,8 @@ class QCGN2oEI_Minimal(nn.Module):
         num_heads: int = 24,
         output_dim: int = 1000,
         dropout: float = 0.1,
-        use_edge_attr: bool = True
+        use_edge_attr: bool = True,
+        gradient_checkpointing: bool = False
     ):
         """
         Initialize QCGN2oEI_Minimal model (v5.1 Medium-Large Scale)
@@ -77,6 +79,7 @@ class QCGN2oEI_Minimal(nn.Module):
             output_dim: Output spectrum dimension (default: 1000 for m/z 1-1000)
             dropout: Dropout rate (default: 0.1)
             use_edge_attr: Whether to use edge attributes (default: True)
+            gradient_checkpointing: Whether to use gradient checkpointing to save memory
         """
         super().__init__()
 
@@ -88,6 +91,7 @@ class QCGN2oEI_Minimal(nn.Module):
         self.output_dim = output_dim
         self.dropout = dropout
         self.use_edge_attr = use_edge_attr
+        self.gradient_checkpointing = gradient_checkpointing
 
         # Node encoder: 16 → 256
         self.node_encoder = nn.Sequential(
@@ -154,6 +158,7 @@ class QCGN2oEI_Minimal(nn.Module):
         logger.info(f"  Output dim: {output_dim} (m/z 1-{output_dim})")
         logger.info(f"  Dropout: {dropout}")
         logger.info(f"  Use edge attr: {use_edge_attr}")
+        logger.info(f"  Gradient Checkpointing: {gradient_checkpointing}")
 
         # Count parameters
         total_params = sum(p.numel() for p in self.parameters())
@@ -189,24 +194,34 @@ class QCGN2oEI_Minimal(nn.Module):
         else:
             edge_attr_encoded = None
 
-        # 10-layer GATv2Conv with residual connections
-        for i in range(self.num_layers):
-            # Store input for residual
-            residual = x
-
+        # 16-layer GATv2Conv with residual connections
+        # Define wrapper for checkpointing
+        def run_layer(layer_idx, x_in, edge_index_in, edge_attr_in):
             # GATv2Conv layer
-            x = self.gat_layers[i](
-                x,
-                edge_index,
-                edge_attr=edge_attr_encoded
+            out = self.gat_layers[layer_idx](
+                x_in,
+                edge_index_in,
+                edge_attr=edge_attr_in
             )
-
             # Residual connection with projection
-            # Following QC-GN2oMS2: output = ELU(GATv2(x) + Linear(residual))
-            x = F.elu(x + self.residual_layers[i](residual))
-
+            out = F.elu(out + self.residual_layers[layer_idx](x_in))
             # Dropout
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            out = F.dropout(out, p=self.dropout, training=self.training)
+            return out
+
+        for i in range(self.num_layers):
+            if self.gradient_checkpointing and self.training:
+                # Use checkpointing
+                # Note: edge_index is int tensor, so it doesn't require grad, which is fine
+                # but checkpoint wants inputs with requires_grad=True to form the graph correctly.
+                # x has grad. edge_attr_encoded has grad.
+                x = checkpoint(
+                    run_layer,
+                    i, x, edge_index, edge_attr_encoded,
+                    use_reentrant=False
+                )
+            else:
+                x = run_layer(i, x, edge_index, edge_attr_encoded)
 
         # Global mean pooling
         if batch is None:
