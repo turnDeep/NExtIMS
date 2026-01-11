@@ -288,8 +288,8 @@ def main():
                         help='Output model path')
     parser.add_argument('--epochs', type=int, default=200,
                         help='Number of epochs (default: 200)')
-    parser.add_argument('--batch-size', type=int, default=8,
-                        help='Batch size (default: 8 for Medium-Large model)')
+    parser.add_argument('--batch-size', type=int, default=32,
+                        help='Batch size (default: 32 for RTX 5070 Ti)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
     parser.add_argument('--hidden-dim', type=int, default=768,
