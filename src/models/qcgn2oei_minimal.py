@@ -7,14 +7,14 @@ Quantum Chemistry-augmented Graph Neural Network for EI-MS prediction.
 Minimal configuration based on QC-GN2oMS2 architecture, adapted for EI-MS.
 
 Architecture:
-- 10-layer GATv2Conv with residual connections
-- 8 attention heads per layer
-- Hidden dimension: 256
+- 14-layer GATv2Conv with residual connections
+- 24 attention heads per layer
+- Hidden dimension: 768
 - Global mean pooling
 - Output: m/z 1-1000 spectrum (1000 dimensions)
 
 Design Philosophy:
-- Minimal feature dimensions (16-dim nodes, 3-dim edges)
+- Minimal feature dimensions (34-dim nodes, 10-dim edges)
 - Deep GATv2 architecture for representation learning
 - BDE-enriched edges for fragmentation modeling
 - ELU activation for smooth gradients
@@ -41,39 +41,39 @@ class QCGN2oEI_Minimal(nn.Module):
     Minimal Graph Neural Network for EI-MS Prediction
 
     QC-GN2oMS2-inspired architecture adapted for EI-MS:
-    - Input: 16-dim node features, 3-dim edge features
-    - GNN: 10-layer GATv2Conv with residual connections
+    - Input: 34-dim node features, 10-dim edge features
+    - GNN: 14-layer GATv2Conv with residual connections
     - Pooling: Global mean pooling
     - Output: 1000-dim spectrum (m/z 1-1000)
 
     Key Differences from QC-GN2oMS2:
     - Task: MS/MS → EI-MS
-    - Node features: 16-dim (same as QC-GN2oMS2)
-    - Edge features: 2-dim (QC-GN2oMS2) → 3-dim (adds BDE)
+    - Node features: 16-dim (QC-GN2oMS2) → 34-dim (v4.4)
+    - Edge features: 2-dim (QC-GN2oMS2) → 10-dim (v4.4, adds BDE + stereo)
     - Output: Variable m/z → Fixed m/z 1-1000
-    - Hidden dim: 128 (QC-GN2oMS2) → 256 (v4.2, better capacity)
+    - Hidden dim: 128 (QC-GN2oMS2) → 768 (v5.1 Scaled)
     """
 
     def __init__(
         self,
         node_dim: int = 34,
         edge_dim: int = 10,
-        hidden_dim: int = 512,
-        num_layers: int = 12,
-        num_heads: int = 16,
+        hidden_dim: int = 768,
+        num_layers: int = 14,
+        num_heads: int = 24,
         output_dim: int = 1000,
         dropout: float = 0.1,
         use_edge_attr: bool = True
     ):
         """
-        Initialize QCGN2oEI_Minimal model (v4.4 Scaled)
+        Initialize QCGN2oEI_Minimal model (v5.1 Scaled)
 
         Args:
             node_dim: Node feature dimension (default: 34 for v4.4)
             edge_dim: Edge feature dimension (default: 10 for v4.4)
-            hidden_dim: Hidden dimension (default: 512)
-            num_layers: Number of GATv2 layers (default: 12)
-            num_heads: Number of attention heads (default: 16)
+            hidden_dim: Hidden dimension (default: 768)
+            num_layers: Number of GATv2 layers (default: 14)
+            num_heads: Number of attention heads (default: 24)
             output_dim: Output spectrum dimension (default: 1000 for m/z 1-1000)
             dropout: Dropout rate (default: 0.1)
             use_edge_attr: Whether to use edge attributes (default: True)
@@ -89,14 +89,14 @@ class QCGN2oEI_Minimal(nn.Module):
         self.dropout = dropout
         self.use_edge_attr = use_edge_attr
 
-        # Node encoder: 16 → 256
+        # Node encoder: node_dim → hidden_dim
         self.node_encoder = nn.Sequential(
             nn.Linear(node_dim, hidden_dim),
             nn.ELU(),
             nn.Dropout(dropout)
         )
 
-        # Edge encoder: 3 → 256 (if using edge attributes)
+        # Edge encoder: edge_dim → hidden_dim (if using edge attributes)
         if use_edge_attr:
             self.edge_encoder = nn.Sequential(
                 nn.Linear(edge_dim, hidden_dim),
@@ -106,7 +106,7 @@ class QCGN2oEI_Minimal(nn.Module):
         else:
             self.edge_encoder = None
 
-        # 10-layer GATv2Conv with residual connections
+        # GATv2Conv layers with residual connections
         self.gat_layers = nn.ModuleList()
         self.residual_layers = nn.ModuleList()
 
@@ -189,7 +189,7 @@ class QCGN2oEI_Minimal(nn.Module):
         else:
             edge_attr_encoded = None
 
-        # 10-layer GATv2Conv with residual connections
+        # GATv2Conv layers with residual connections
         for i in range(self.num_layers):
             # Store input for residual
             residual = x
@@ -256,16 +256,8 @@ if __name__ == "__main__":
     print("QCGN2oEI_Minimal Model Test")
     print("="*60)
 
-    # Create model
-    model = QCGN2oEI_Minimal(
-        node_dim=34,
-        edge_dim=10,
-        hidden_dim=512,
-        num_layers=12,
-        num_heads=16,
-        output_dim=1000,
-        dropout=0.1
-    )
+    # Create model with defaults (v5.1 Scaled)
+    model = QCGN2oEI_Minimal()
 
     # Print model info
     info = model.get_model_info()
@@ -285,12 +277,12 @@ if __name__ == "__main__":
     num_nodes = 6
     num_edges = 12  # Bidirectional
 
-    x = torch.randn(num_nodes, 34)  # Node features
+    x = torch.randn(num_nodes, info['node_dim'])  # Node features
     edge_index = torch.tensor([
         [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 0],
         [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 0, 5]
     ], dtype=torch.long)
-    edge_attr = torch.randn(num_edges, 10)  # Edge features
+    edge_attr = torch.randn(num_edges, info['edge_dim'])  # Edge features
 
     # Single graph
     print("\nSingle graph:")
