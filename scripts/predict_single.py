@@ -63,15 +63,27 @@ def parse_msp_entry(lines):
             continue
 
         if reading_peaks:
-            # Check if it looks like a peak line "mz intensity"
-            parts = line.split()
-            if len(parts) >= 2 and parts[0][0].isdigit():
-                try:
-                    mz = float(parts[0])
-                    intensity = float(parts[1])
-                    peaks.append((mz, intensity))
-                except ValueError:
-                    pass
+            # Parse peaks (could be "mz int" or "mz int; mz int")
+            # Remove trailing semicolons and split by semicolon if present
+            # Or just split by whitespace if no semicolons
+
+            # Robust parsing: find all pairs of numbers
+            try:
+                # Replace delimiters with space
+                clean_line = line.replace(';', ' ').replace(':', ' ')
+                tokens = clean_line.split()
+
+                # Iterate in pairs
+                for i in range(0, len(tokens) - 1, 2):
+                    mz_str = tokens[i]
+                    int_str = tokens[i+1]
+
+                    if mz_str[0].isdigit(): # Check if it starts with digit
+                        mz = float(mz_str)
+                        intensity = float(int_str)
+                        peaks.append((mz, intensity))
+            except ValueError:
+                pass
         else:
             if ":" in line:
                 key, val = line.split(":", 1)
@@ -558,6 +570,12 @@ def main():
 
     # Optional arguments
     parser.add_argument(
+        '--prediction-smiles',
+        type=str,
+        default=None,
+        help='SMILES string to use for prediction (overrides SMILES from CAS lookup)'
+    )
+    parser.add_argument(
         '--bde-cache',
         type=str,
         default=None,
@@ -640,6 +658,11 @@ def main():
             else:
                 logger.error(f"Input '{args.smiles}' not found in NIST17.MSP and is not a valid SMILES.")
                 sys.exit(1)
+
+        # Apply override if provided
+        if args.prediction_smiles:
+            logger.info(f"Overriding prediction SMILES with: {args.prediction_smiles}")
+            real_smiles = args.prediction_smiles
 
         # Predict spectrum
         spectrum, metadata = predict_spectrum(

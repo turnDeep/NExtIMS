@@ -25,7 +25,7 @@ This pretrained model can be used as a starting point for fine-tuning on BDE-db2
 # Fine-tune on BDE-db2 dataset
 python scripts/train_bondnet_bde_db2.py \
     --data-dir data/processed/bondnet_training/ \
-    --pretrained models/bondnet_pretrained.pkl \
+    --pretrained models/bondnet_pretrained.pth \
     --output models/bondnet_bde_db2_finetuned.pth \
     --epochs 50 \
     --lr 0.0001
@@ -48,4 +48,4 @@ For BDE-db2's additional elements (S, Cl, F, P, Br, I), fine-tuning will:
 
 ## Download Date
 
-Model downloaded: 1765894528.3909407
+Model downloaded: 1768305675.9377275
