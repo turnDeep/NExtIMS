@@ -47,6 +47,125 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def parse_msp_entry(lines):
+    entry = {}
+    peaks = []
+    reading_peaks = False
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        if line.startswith("Num peaks:"):
+            entry["Num peaks"] = int(line.split(":")[1].strip())
+            reading_peaks = True
+            continue
+
+        if reading_peaks:
+            # Check if it looks like a peak line "mz intensity"
+            parts = line.split()
+            if len(parts) >= 2 and parts[0][0].isdigit():
+                try:
+                    mz = float(parts[0])
+                    intensity = float(parts[1])
+                    peaks.append((mz, intensity))
+                except ValueError:
+                    pass
+        else:
+            if ":" in line:
+                key, val = line.split(":", 1)
+                entry[key.strip()] = val.strip()
+
+    return entry, peaks
+
+
+def search_nist17_by_cas(cas_no: str, root_dir: Path) -> tuple[dict, list]:
+    """
+    Search NIST17.MSP for a CAS number.
+
+    Args:
+        cas_no: CAS number string
+        root_dir: Root directory of the repository
+
+    Returns:
+        Tuple of (entry_dict, peaks_list) or (None, None) if not found.
+    """
+    msp_path = root_dir / 'data' / 'NIST17.MSP'
+    if not msp_path.exists():
+        logger.warning(f"NIST17.MSP not found at {msp_path}")
+        return None, None
+
+    logger.info(f"Searching for CAS: {cas_no} in {msp_path}")
+
+    with open(msp_path, 'r', encoding='utf-8', errors='ignore') as f:
+        chunk = []
+        is_target = False
+
+        for line in f:
+            if line.startswith("Name:"):
+                if is_target:
+                    # We finished reading the target block
+                    return parse_msp_entry(chunk)
+
+                chunk = [line]
+                is_target = False
+            else:
+                chunk.append(line)
+                if line.strip().startswith("CASNO:"):
+                    parts = line.split(":", 1)
+                    if len(parts) > 1 and parts[1].strip() == cas_no:
+                        is_target = True
+
+        # Check last block
+        if is_target:
+            return parse_msp_entry(chunk)
+
+    return None, None
+
+
+def get_smiles_from_mol_file(mol_id: str, root_dir: Path) -> str:
+    """
+    Get SMILES from a MOL file in data/mol_files.
+
+    Args:
+        mol_id: ID string (e.g., "200001")
+        root_dir: Root directory of the repository
+
+    Returns:
+        SMILES string or None
+    """
+    mol_path = root_dir / 'data' / 'mol_files' / f"ID{mol_id}.MOL"
+    if not mol_path.exists():
+        logger.warning(f"MOL file not found: {mol_path}")
+        return None
+
+    try:
+        mol = Chem.MolFromMolFile(str(mol_path))
+        if mol:
+            return Chem.MolToSmiles(mol)
+    except Exception as e:
+        logger.warning(f"Failed to read MOL file {mol_path}: {e}")
+
+    return None
+
+
+def peaks_to_array(peaks: list, min_mz: int = 1, max_mz: int = 1000) -> np.ndarray:
+    """Convert peak list to intensity array."""
+    size = max_mz - min_mz + 1
+    arr = np.zeros(size)
+    for mz, intensity in peaks:
+        idx = int(round(mz)) - min_mz
+        if 0 <= idx < size:
+            arr[idx] = max(arr[idx], intensity)
+
+    # Normalize to 100
+    if arr.max() > 0:
+        arr = (arr / arr.max()) * 100.0
+
+    return arr
+
+
 def validate_molecule(smiles: str) -> tuple[Chem.Mol, dict]:
     """
     Validate SMILES and extract molecular properties
@@ -253,11 +372,13 @@ def visualize_spectrum(
     smiles: str,
     output_path: str = "predicted_spectrum.png",
     mz_range: tuple[int, int] = (1, 1000),
-    figsize: tuple[int, int] = (12, 6),
-    dpi: int = 300
+    figsize: tuple[int, int] = (12, 8),
+    dpi: int = 300,
+    experimental_spectrum: np.ndarray = None,
+    title: str = None
 ):
     """
-    Visualize predicted spectrum
+    Visualize predicted spectrum (and optionally experimental spectrum)
 
     Args:
         spectrum: Predicted intensity array
@@ -266,43 +387,106 @@ def visualize_spectrum(
         mz_range: m/z range (min, max)
         figsize: Figure size
         dpi: DPI for output
+        experimental_spectrum: Optional experimental intensity array
+        title: Optional title
     """
     mz_values = np.arange(mz_range[0], mz_range[0] + len(spectrum))
+
+    # Normalize predicted spectrum to 100
+    if spectrum.max() > 0:
+        spectrum = (spectrum / spectrum.max()) * 100.0
 
     # Create plot
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Stem plot for spectrum
-    markerline, stemlines, baseline = ax.stem(
-        mz_values,
-        spectrum,
-        linefmt='b-',
-        markerfmt='bo',
-        basefmt=' '
-    )
-    stemlines.set_linewidth(0.5)
-    markerline.set_markersize(2)
+    # Plot experimental spectrum if available (on top)
+    if experimental_spectrum is not None:
+        # Normalize experimental spectrum to 100
+        if experimental_spectrum.max() > 0:
+            experimental_spectrum = (experimental_spectrum / experimental_spectrum.max()) * 100.0
 
-    ax.set_xlabel("m/z", fontsize=12, fontweight='bold')
-    ax.set_ylabel("Relative Intensity", fontsize=12, fontweight='bold')
-    ax.set_title(f"Predicted EI-MS Spectrum\n{smiles}", fontsize=14, fontweight='bold')
-    ax.grid(True, alpha=0.3, linestyle='--')
-    ax.set_xlim(mz_range)
-    ax.set_ylim(0, spectrum.max() * 1.1)
+        markerline_exp, stemlines_exp, baseline_exp = ax.stem(
+            mz_values,
+            experimental_spectrum,
+            linefmt='k-',
+            markerfmt=' ',
+            basefmt=' '
+        )
+        plt.setp(stemlines_exp, 'linewidth', 1.0)
 
-    # Add annotation for base peak
-    base_peak_idx = np.argmax(spectrum)
-    base_peak_mz = base_peak_idx + mz_range[0]
-    base_peak_intensity = spectrum[base_peak_idx]
+        # Annotate top peaks for experimental
+        top_exp_indices = np.argsort(experimental_spectrum)[-5:]
+        for idx in top_exp_indices:
+             if experimental_spectrum[idx] > 10:
+                mz = idx + mz_range[0]
+                ax.text(mz, experimental_spectrum[idx] + 2, f"{mz}", ha='center', va='bottom', fontsize=10)
 
-    ax.annotate(
-        f'Base peak\nm/z {base_peak_mz}\n({base_peak_intensity:.3f})',
-        xy=(base_peak_mz, base_peak_intensity),
-        xytext=(base_peak_mz + 50, base_peak_intensity * 0.8),
-        arrowprops=dict(arrowstyle='->', color='red', lw=1.5),
-        fontsize=10,
-        bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7)
-    )
+    # Plot predicted spectrum (on bottom, inverted)
+    # If experimental is present, we invert predicted. If not, we could keep it normal or invert?
+    # Let's align with the request: "experimental ... and predicted ... up and down".
+    # If no experimental, we probably just want standard plot.
+
+    if experimental_spectrum is not None:
+        spectrum_inverted = -spectrum
+        markerline_pred, stemlines_pred, baseline_pred = ax.stem(
+            mz_values,
+            spectrum_inverted,
+            linefmt='C1-',  # Orange color
+            markerfmt=' ',
+            basefmt=' '
+        )
+        plt.setp(stemlines_pred, 'linewidth', 1.0)
+
+        # Annotate top peaks for predicted
+        top_pred_indices = np.argsort(spectrum)[-5:]
+        for idx in top_pred_indices:
+             if spectrum[idx] > 10:
+                mz = idx + mz_range[0]
+                ax.text(mz, -spectrum[idx] - 8, f"{mz}", ha='center', va='top', fontsize=10, color='C1')
+
+        # Formatting
+        ax.axhline(0, color='gray', linewidth=1)
+
+        ax.set_xlabel("Predicted mass spectrum", fontsize=14)
+        ax.set_title("Experimental mass spectrum", loc='left', fontsize=14)
+        ax.set_ylim(-110, 110)
+        # Custom Y ticks to show positive values for both
+        yticks = [-100, -50, 0, 50, 100]
+        yticklabels = ['100', '50', '0', '50', '100']
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticklabels)
+
+    else:
+        # Standard plot
+        markerline, stemlines, baseline = ax.stem(
+            mz_values,
+            spectrum,
+            linefmt='b-',
+            markerfmt='bo',
+            basefmt=' '
+        )
+        stemlines.set_linewidth(0.5)
+        markerline.set_markersize(2)
+        ax.set_xlabel("m/z", fontsize=12, fontweight='bold')
+        ax.set_ylabel("Relative Intensity", fontsize=12, fontweight='bold')
+        ax.set_title(f"Predicted EI-MS Spectrum\n{smiles}", fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.set_xlim(mz_range)
+        ax.set_ylim(0, 110)
+
+        # Add annotation for base peak
+        base_peak_idx = np.argmax(spectrum)
+        base_peak_mz = base_peak_idx + mz_range[0]
+        base_peak_intensity = spectrum[base_peak_idx]
+
+        ax.annotate(
+            f'Base peak\nm/z {base_peak_mz}\n({base_peak_intensity:.1f})',
+            xy=(base_peak_mz, base_peak_intensity),
+            xytext=(base_peak_mz + 50, base_peak_intensity * 0.8),
+            arrowprops=dict(arrowstyle='->', color='red', lw=1.5),
+            fontsize=10,
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7)
+        )
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
@@ -419,9 +603,47 @@ def main():
     args = parser.parse_args()
 
     try:
+        root_dir = Path(__file__).parent.parent
+        experimental_spectrum = None
+        real_smiles = args.smiles
+
+        # Check if input is a valid SMILES
+        is_smiles = True
+        try:
+            m = Chem.MolFromSmiles(args.smiles)
+            if m is None:
+                is_smiles = False
+            elif m.GetNumAtoms() == 0:
+                 is_smiles = False
+        except:
+            is_smiles = False
+
+        if not is_smiles:
+            logger.info(f"Input '{args.smiles}' is not a valid SMILES. Searching NIST17.MSP for CAS number...")
+            entry, peaks = search_nist17_by_cas(args.smiles, root_dir)
+            if entry:
+                mol_id = entry.get('ID')
+                logger.info(f"Found CAS {args.smiles}: ID={mol_id}")
+                if mol_id:
+                    found_smiles = get_smiles_from_mol_file(mol_id, root_dir)
+                    if found_smiles:
+                        logger.info(f"Retrieved SMILES: {found_smiles}")
+                        real_smiles = found_smiles
+                        if peaks:
+                            experimental_spectrum = peaks_to_array(peaks, min_mz=args.min_mz, max_mz=args.max_mz)
+                    else:
+                        logger.error("MOL file not found for the identified entry.")
+                        sys.exit(1)
+                else:
+                    logger.error("Entry found but no ID present.")
+                    sys.exit(1)
+            else:
+                logger.error(f"Input '{args.smiles}' not found in NIST17.MSP and is not a valid SMILES.")
+                sys.exit(1)
+
         # Predict spectrum
         spectrum, metadata = predict_spectrum(
-            smiles=args.smiles,
+            smiles=real_smiles,
             model_path=args.model,
             bde_cache_path=args.bde_cache,
             device=args.device,
@@ -436,9 +658,10 @@ def main():
         if args.visualize:
             visualize_spectrum(
                 spectrum=spectrum,
-                smiles=args.smiles,
+                smiles=real_smiles,
                 output_path=args.output,
-                mz_range=(args.min_mz, args.max_mz)
+                mz_range=(args.min_mz, args.max_mz),
+                experimental_spectrum=experimental_spectrum
             )
 
         logger.info("Prediction complete!")
