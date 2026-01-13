@@ -292,12 +292,12 @@ def main():
                         help='Batch size (default: 32 for RTX 5070 Ti)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
-    parser.add_argument('--hidden-dim', type=int, default=512,
-                        help='Hidden dimension (default: 512)')
-    parser.add_argument('--num-layers', type=int, default=12,
-                        help='Number of GATv2 layers (default: 12)')
-    parser.add_argument('--num-heads', type=int, default=16,
-                        help='Number of attention heads (default: 16)')
+    parser.add_argument('--hidden-dim', type=int, default=768,
+                        help='Hidden dimension (default: 768)')
+    parser.add_argument('--num-layers', type=int, default=14,
+                        help='Number of GATv2 layers (default: 14)')
+    parser.add_argument('--num-heads', type=int, default=24,
+                        help='Number of attention heads (default: 24)')
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='Dropout rate (default: 0.1)')
     parser.add_argument('--max-samples', type=int, default=0,
@@ -362,6 +362,9 @@ def main():
     )
 
     # Create model
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
     model = QCGN2oEI_Minimal(
         node_dim=34,
         edge_dim=10,
