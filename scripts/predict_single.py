@@ -251,6 +251,7 @@ def get_top_peaks(
 def visualize_spectrum(
     spectrum: np.ndarray,
     smiles: str,
+    metadata: dict = None,
     output_path: str = "predicted_spectrum.png",
     mz_range: tuple[int, int] = (1, 1000),
     figsize: tuple[int, int] = (12, 6),
@@ -262,12 +263,18 @@ def visualize_spectrum(
     Args:
         spectrum: Predicted intensity array
         smiles: SMILES string (for title)
+        metadata: Metadata dictionary containing molecular properties
         output_path: Path to save plot
         mz_range: m/z range (min, max)
         figsize: Figure size
         dpi: DPI for output
     """
     mz_values = np.arange(mz_range[0], mz_range[0] + len(spectrum))
+
+    # Normalize to Relative Intensity (0-100%)
+    max_intensity = spectrum.max()
+    if max_intensity > 0:
+        spectrum = (spectrum / max_intensity) * 100.0
 
     # Create plot
     fig, ax = plt.subplots(figsize=figsize)
@@ -277,32 +284,48 @@ def visualize_spectrum(
         mz_values,
         spectrum,
         linefmt='b-',
-        markerfmt='bo',
+        markerfmt=' ',  # No markers
         basefmt=' '
     )
     stemlines.set_linewidth(0.5)
-    markerline.set_markersize(2)
 
     ax.set_xlabel("m/z", fontsize=12, fontweight='bold')
-    ax.set_ylabel("Relative Intensity", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Relative Intensity (%)", fontsize=12, fontweight='bold')
     ax.set_title(f"Predicted EI-MS Spectrum\n{smiles}", fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3, linestyle='--')
-    ax.set_xlim(mz_range)
-    ax.set_ylim(0, spectrum.max() * 1.1)
 
-    # Add annotation for base peak
-    base_peak_idx = np.argmax(spectrum)
-    base_peak_mz = base_peak_idx + mz_range[0]
-    base_peak_intensity = spectrum[base_peak_idx]
+    # Set x-axis limit based on molecular weight
+    if metadata and 'properties' in metadata:
+        mw = metadata['properties']['molecular_weight']
+        ax.set_xlim(0, mw + 50)
+    else:
+        ax.set_xlim(mz_range)
 
-    ax.annotate(
-        f'Base peak\nm/z {base_peak_mz}\n({base_peak_intensity:.3f})',
-        xy=(base_peak_mz, base_peak_intensity),
-        xytext=(base_peak_mz + 50, base_peak_intensity * 0.8),
-        arrowprops=dict(arrowstyle='->', color='red', lw=1.5),
-        fontsize=10,
-        bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7)
-    )
+    ax.set_ylim(0, 110)
+
+    # Annotate Top 10 peaks
+    # Using normalized spectrum (0-100)
+    top_indices = np.argsort(spectrum)[::-1]
+    count = 0
+    for idx in top_indices:
+        if count >= 10:
+            break
+
+        intensity = spectrum[idx]
+        if intensity < 0.1:  # Skip noise (0.1%)
+            continue
+
+        mz = idx + mz_range[0]
+
+        ax.text(
+            mz,
+            intensity + 1,
+            f"{int(mz)}",
+            ha='center',
+            va='bottom',
+            fontsize=9
+        )
+        count += 1
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
@@ -437,6 +460,7 @@ def main():
             visualize_spectrum(
                 spectrum=spectrum,
                 smiles=args.smiles,
+                metadata=metadata,
                 output_path=args.output,
                 mz_range=(args.min_mz, args.max_mz)
             )

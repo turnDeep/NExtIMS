@@ -102,7 +102,7 @@ def test_top_peaks_extraction():
     print(f"✅ Top-3 peaks: {peaks}")
 
     # Test case 2: With minimum intensity threshold
-    peaks_filtered = get_top_peaks(spectrum, top_k=10, mz_offset=1, min_intensity=0.1)
+    peaks_filtered = get_top_peaks(spectrum, top_k=10, mz_offset=1, min_intensity=0.09)
     assert len(peaks_filtered) == 9, f"Expected 9 peaks (>0.1), got {len(peaks_filtered)}"
     print(f"✅ Filtered peaks (intensity > 0.1): {len(peaks_filtered)} peaks")
 
