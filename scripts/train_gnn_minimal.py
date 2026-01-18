@@ -7,6 +7,7 @@ Trains QCGN2oEI_Minimal model on NIST17 EI-MS dataset with:
 - Cosine similarity loss
 - Batch size optimization for RTX 5070 Ti
 - BDE-enriched graph inputs
+- Ablation study support
 
 Usage:
     python scripts/train_gnn_minimal.py \\
@@ -23,7 +24,7 @@ import argparse
 import logging
 from pathlib import Path
 import time
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import torch
 import torch.nn as nn
@@ -62,7 +63,8 @@ class NISTGraphDataset(Dataset):
         bondnet_model: str = None,
         max_samples: int = 0,
         min_mz: int = 1,
-        max_mz: int = 1000
+        max_mz: int = 1000,
+        featurizer_kwargs: Dict[str, Any] = None
     ):
         """
         Args:
@@ -72,6 +74,7 @@ class NISTGraphDataset(Dataset):
             max_samples: Maximum samples to load (0 = all)
             min_mz: Minimum m/z (default: 1)
             max_mz: Maximum m/z (default: 1000)
+            featurizer_kwargs: Dictionary of arguments for QCGNFeaturizer
         """
         self.min_mz = min_mz
         self.max_mz = max_mz
@@ -81,7 +84,8 @@ class NISTGraphDataset(Dataset):
             bde_cache_path=bde_cache_path,
             use_bde_calculator=(bondnet_model is not None),
             bondnet_model=bondnet_model,
-            default_bde=85.0
+            default_bde=85.0,
+            **(featurizer_kwargs or {})
         )
 
         # Parse MSP file and load chemical structures from MOL files
@@ -311,7 +315,37 @@ def main():
     parser.add_argument('--save-interval', type=int, default=10,
                         help='Save checkpoint every N epochs')
 
+    # Ablation arguments
+    parser.add_argument('--no-atom-type', action='store_true', help='Disable atom type feature')
+    parser.add_argument('--no-hybridization', action='store_true', help='Disable hybridization feature')
+    parser.add_argument('--no-aromaticity', action='store_true', help='Disable aromaticity feature')
+    parser.add_argument('--no-num-hs', action='store_true', help='Disable NumHs feature')
+    parser.add_argument('--no-formal-charge', action='store_true', help='Disable formal charge feature')
+    parser.add_argument('--no-radical', action='store_true', help='Disable radical electrons feature')
+    parser.add_argument('--no-ring', action='store_true', help='Disable ring info feature')
+    parser.add_argument('--no-chirality', action='store_true', help='Disable chirality feature')
+    parser.add_argument('--no-bond-order', action='store_true', help='Disable bond order feature')
+    parser.add_argument('--no-bde', action='store_true', help='Disable BDE feature')
+    parser.add_argument('--no-conjugation', action='store_true', help='Disable conjugation feature')
+    parser.add_argument('--no-stereo', action='store_true', help='Disable bond stereo feature')
+
     args = parser.parse_args()
+
+    # Prepare featurizer kwargs
+    featurizer_kwargs = {
+        'include_atom_type': not args.no_atom_type,
+        'include_hybridization': not args.no_hybridization,
+        'include_aromaticity': not args.no_aromaticity,
+        'include_num_hs': not args.no_num_hs,
+        'include_formal_charge': not args.no_formal_charge,
+        'include_radical_electrons': not args.no_radical,
+        'include_ring_info': not args.no_ring,
+        'include_chirality': not args.no_chirality,
+        'include_bond_order': not args.no_bond_order,
+        'use_bde': not args.no_bde,
+        'include_conjugation': not args.no_conjugation,
+        'include_stereo': not args.no_stereo,
+    }
 
     logger.info("="*80)
     logger.info("NExtIMS v4.2: Minimal GNN Training")
@@ -323,6 +357,11 @@ def main():
     logger.info(f"Batch size: {args.batch_size}")
     logger.info(f"Learning rate: {args.lr}")
     logger.info(f"Device: {args.device}")
+
+    # Log ablation settings
+    logger.info("\nFeature Configuration:")
+    for k, v in featurizer_kwargs.items():
+        logger.info(f"  {k}: {v}")
     logger.info("")
 
     # Load dataset
@@ -330,8 +369,17 @@ def main():
         msp_path=args.nist_msp,
         bde_cache_path=args.bde_cache,
         bondnet_model=args.bondnet_model,
-        max_samples=args.max_samples
+        max_samples=args.max_samples,
+        featurizer_kwargs=featurizer_kwargs
     )
+
+    # Get dynamic dimensions
+    node_dim = dataset.graph_gen.featurizer.get_node_dim()
+    edge_dim = dataset.graph_gen.featurizer.get_edge_dim()
+
+    logger.info(f"Model Input Dimensions:")
+    logger.info(f"  Node Dim: {node_dim}")
+    logger.info(f"  Edge Dim: {edge_dim}")
 
     # Train/val split
     val_size = int(len(dataset) * args.val_split)
@@ -366,8 +414,8 @@ def main():
         torch.cuda.empty_cache()
     
     model = QCGN2oEI_Minimal(
-        node_dim=34,
-        edge_dim=10,
+        node_dim=node_dim, # Dynamic
+        edge_dim=edge_dim, # Dynamic
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         num_heads=args.num_heads,
