@@ -37,27 +37,7 @@ logger = logging.getLogger(__name__)
 class QCGNFeaturizer:
     """
     Enhanced molecular featurizer for v4.4 (Stereochemistry)
-
-    Node Features (34-dim):
-        - [0-14] 15 atom types (one-hot via mass matching)
-        - [15-20] 6 hybridization types (S, SP, SP2, SP3, SP3D, SP3D2)
-        - [21] Is Aromatic (bool)
-        - [22-26] Total Num Hs (one-hot: 0, 1, 2, 3, 4+)
-        - [27] Formal Charge (integer)
-        - [28] Radical Electrons (integer)
-        - [29] In Ring (bool)
-        - [30-33] Chiral Tag (one-hot: Unspecified, CW, CCW, Other)
-
-    Edge Features (10-dim):
-        - [0] bond_order: 1.0 (single), 2.0 (double), 3.0 (triple), 1.5 (aromatic)
-        - [1] BDE: Bond Dissociation Energy (kcal/mol), normalized [0, 1]
-        - [2] in_ring: Binary indicator
-        - [3] is_conjugated: Binary indicator
-        - [4-9] Bond Stereo (one-hot: None, Any, Z, E, Cis, Trans)
-
-    Key Differences from v4.3:
-        - Node: 30-dim → 34-dim (Adds Chirality)
-        - Edge: 4-dim → 10-dim (Adds Bond Stereo)
+    Supports ablation studies by toggling specific features.
     """
 
     # Atom masses for one-hot encoding
@@ -115,91 +95,144 @@ class QCGNFeaturizer:
         self,
         use_bde: bool = True,
         bde_min: float = 50.0,
-        bde_max: float = 200.0
+        bde_max: float = 200.0,
+        include_atom_type: bool = True,
+        include_hybridization: bool = True,
+        include_aromaticity: bool = True,
+        include_num_hs: bool = True,
+        include_formal_charge: bool = True,
+        include_radical_electrons: bool = True,
+        include_ring_info: bool = True,
+        include_chirality: bool = True,
+        include_bond_order: bool = True,
+        include_conjugation: bool = True,
+        include_stereo: bool = True
     ):
         """
-        Initialize Enhanced QCGN featurizer
+        Initialize Enhanced QCGN featurizer with ablation support
 
         Args:
             use_bde: Whether to include BDE in edge features
             bde_min: Minimum BDE for normalization (kcal/mol)
             bde_max: Maximum BDE for normalization (kcal/mol)
+            include_*: Flags to include specific features
         """
         self.use_bde = use_bde
         self.bde_min = bde_min
         self.bde_max = bde_max
 
-        # Calculate dimensions
-        self.node_dim = 34
-        self.edge_dim = 10
+        # Node feature flags
+        self.include_atom_type = include_atom_type
+        self.include_hybridization = include_hybridization
+        self.include_aromaticity = include_aromaticity
+        self.include_num_hs = include_num_hs
+        self.include_formal_charge = include_formal_charge
+        self.include_radical_electrons = include_radical_electrons
+        self.include_ring_info = include_ring_info
+        self.include_chirality = include_chirality
 
-        logger.info("QCGNFeaturizer (v4.4 Stereochemistry) initialized:")
-        logger.info(f"  Node features: {self.node_dim}-dim (+Chirality)")
-        logger.info(f"  Edge features: {self.edge_dim}-dim (+Stereo)")
+        # Edge feature flags
+        self.include_bond_order = include_bond_order
+        self.include_conjugation = include_conjugation
+        self.include_stereo = include_stereo
+
+        # Calculate dimensions dynamically
+        self.node_dim = 0
+        if self.include_atom_type: self.node_dim += 15
+        if self.include_hybridization: self.node_dim += 6
+        if self.include_aromaticity: self.node_dim += 1
+        if self.include_num_hs: self.node_dim += 5
+        if self.include_formal_charge: self.node_dim += 1
+        if self.include_radical_electrons: self.node_dim += 1
+        if self.include_ring_info: self.node_dim += 1
+        if self.include_chirality: self.node_dim += 4
+
+        self.edge_dim = 0
+        if self.include_bond_order: self.edge_dim += 1
+        if self.use_bde: self.edge_dim += 1
+        if self.include_ring_info: self.edge_dim += 1
+        if self.include_conjugation: self.edge_dim += 1
+        if self.include_stereo: self.edge_dim += 6
+
+        logger.info("QCGNFeaturizer (v4.4 Ablation Ready) initialized:")
+        logger.info(f"  Node features: {self.node_dim}-dim")
+        logger.info(f"  Edge features: {self.edge_dim}-dim")
 
     def get_atom_features(self, atom: Chem.Atom) -> np.ndarray:
         """
-        Get enhanced node features (34-dim)
+        Get enhanced node features
 
         Args:
             atom: RDKit Atom object
 
         Returns:
-            features: [34] numpy array
+            features: numpy array
         """
-        features = np.zeros(self.node_dim, dtype=np.float32)
-        offset = 0
+        features_list = []
 
         # 1. Atom type via mass matching (15-dim one-hot)
-        atom_mass = atom.GetMass()
-        mass_diffs = np.abs(self.ATOM_MASSES - atom_mass)
-        mass_idx = np.argmin(mass_diffs)
-
-        if mass_diffs[mass_idx] < 0.1:
-            features[offset + mass_idx] = 1.0
-        offset += 15
+        if self.include_atom_type:
+            feat = np.zeros(15, dtype=np.float32)
+            atom_mass = atom.GetMass()
+            mass_diffs = np.abs(self.ATOM_MASSES - atom_mass)
+            mass_idx = np.argmin(mass_diffs)
+            if mass_diffs[mass_idx] < 0.1:
+                feat[mass_idx] = 1.0
+            features_list.append(feat)
 
         # 2. Hybridization (6-dim one-hot)
-        hyb = atom.GetHybridization()
-        try:
-            hyb_idx = self.HYBRIDIZATIONS.index(hyb)
-            features[offset + hyb_idx] = 1.0
-        except ValueError:
-            pass
-        offset += 6
+        if self.include_hybridization:
+            feat = np.zeros(6, dtype=np.float32)
+            hyb = atom.GetHybridization()
+            try:
+                hyb_idx = self.HYBRIDIZATIONS.index(hyb)
+                feat[hyb_idx] = 1.0
+            except ValueError:
+                pass
+            features_list.append(feat)
 
         # 3. Is Aromatic (1-dim bool)
-        features[offset] = 1.0 if atom.GetIsAromatic() else 0.0
-        offset += 1
+        if self.include_aromaticity:
+            feat = np.array([1.0 if atom.GetIsAromatic() else 0.0], dtype=np.float32)
+            features_list.append(feat)
 
         # 4. Total Num Hs (5-dim one-hot: 0, 1, 2, 3, 4+)
-        num_hs = atom.GetTotalNumHs()
-        hs_idx = min(num_hs, 4)
-        features[offset + hs_idx] = 1.0
-        offset += 5
+        if self.include_num_hs:
+            feat = np.zeros(5, dtype=np.float32)
+            num_hs = atom.GetTotalNumHs()
+            hs_idx = min(num_hs, 4)
+            feat[hs_idx] = 1.0
+            features_list.append(feat)
 
         # 5. Formal Charge (1-dim integer)
-        features[offset] = float(atom.GetFormalCharge())
-        offset += 1
+        if self.include_formal_charge:
+            feat = np.array([float(atom.GetFormalCharge())], dtype=np.float32)
+            features_list.append(feat)
 
         # 6. Radical Electrons (1-dim integer)
-        features[offset] = float(atom.GetNumRadicalElectrons())
-        offset += 1
+        if self.include_radical_electrons:
+            feat = np.array([float(atom.GetNumRadicalElectrons())], dtype=np.float32)
+            features_list.append(feat)
 
         # 7. In Ring (1-dim bool)
-        features[offset] = 1.0 if atom.IsInRing() else 0.0
-        offset += 1
+        if self.include_ring_info:
+            feat = np.array([1.0 if atom.IsInRing() else 0.0], dtype=np.float32)
+            features_list.append(feat)
 
         # 8. Chiral Tag (4-dim one-hot) [NEW]
-        chi = atom.GetChiralTag()
-        try:
-            chi_idx = self.CHIRAL_TAGS.index(chi)
-            features[offset + chi_idx] = 1.0
-        except ValueError:
-            pass # Should not happen if list is complete
-        offset += 4
+        if self.include_chirality:
+            feat = np.zeros(4, dtype=np.float32)
+            chi = atom.GetChiralTag()
+            try:
+                chi_idx = self.CHIRAL_TAGS.index(chi)
+                feat[chi_idx] = 1.0
+            except ValueError:
+                pass
+            features_list.append(feat)
 
-        return features
+        if not features_list:
+            return np.array([], dtype=np.float32)
+        return np.concatenate(features_list)
 
     def get_edge_features(
         self,
@@ -207,48 +240,61 @@ class QCGNFeaturizer:
         bde_value: Optional[float] = None
     ) -> np.ndarray:
         """
-        Get enhanced edge features (10-dim)
+        Get enhanced edge features
 
         Args:
             bond: RDKit Bond object
             bde_value: BDE value in kcal/mol (optional)
 
         Returns:
-            features: [10] numpy array
+            features: numpy array
         """
-        features = np.zeros(self.edge_dim, dtype=np.float32)
+        features_list = []
 
         # 1. Bond order
-        bond_type_map = {
-            Chem.BondType.SINGLE: 1.0,
-            Chem.BondType.DOUBLE: 2.0,
-            Chem.BondType.TRIPLE: 3.0,
-            Chem.BondType.AROMATIC: 1.5
-        }
-        features[0] = bond_type_map.get(bond.GetBondType(), 1.0)
+        if self.include_bond_order:
+            bond_type_map = {
+                Chem.BondType.SINGLE: 1.0,
+                Chem.BondType.DOUBLE: 2.0,
+                Chem.BondType.TRIPLE: 3.0,
+                Chem.BondType.AROMATIC: 1.5
+            }
+            feat = np.array([bond_type_map.get(bond.GetBondType(), 1.0)], dtype=np.float32)
+            features_list.append(feat)
 
         # 2. BDE normalized
-        if self.use_bde and bde_value is not None:
-            bde_normalized = (bde_value - self.bde_min) / (self.bde_max - self.bde_min)
-            features[1] = np.clip(bde_normalized, 0.0, 1.0)
-        else:
-            features[1] = 0.5
+        if self.use_bde:
+            if bde_value is not None:
+                bde_normalized = (bde_value - self.bde_min) / (self.bde_max - self.bde_min)
+                val = np.clip(bde_normalized, 0.0, 1.0)
+            else:
+                val = 0.5
+            features_list.append(np.array([val], dtype=np.float32))
 
         # 3. In ring
-        features[2] = float(bond.IsInRing())
+        if self.include_ring_info:
+            feat = np.array([float(bond.IsInRing())], dtype=np.float32)
+            features_list.append(feat)
 
         # 4. Is Conjugated
-        features[3] = float(bond.GetIsConjugated())
+        if self.include_conjugation:
+            feat = np.array([float(bond.GetIsConjugated())], dtype=np.float32)
+            features_list.append(feat)
 
         # 5. Bond Stereo (6-dim one-hot) [NEW]
-        stereo = bond.GetStereo()
-        try:
-            stereo_idx = self.BOND_STEREO.index(stereo)
-            features[4 + stereo_idx] = 1.0
-        except ValueError:
-            pass
+        if self.include_stereo:
+            feat = np.zeros(6, dtype=np.float32)
+            stereo = bond.GetStereo()
+            try:
+                stereo_idx = self.BOND_STEREO.index(stereo)
+                feat[stereo_idx] = 1.0
+            except ValueError:
+                pass
+            features_list.append(feat)
 
-        return features
+        if not features_list:
+            return np.array([], dtype=np.float32)
+        return np.concatenate(features_list)
 
     def normalize_bde(self, bde: float) -> float:
         bde_norm = (bde - self.bde_min) / (self.bde_max - self.bde_min)
@@ -301,54 +347,37 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO)
 
-    # Initialize featurizer
+    # Initialize featurizer with default (Full)
+    print("\n" + "="*60)
+    print("Testing Full Features")
     featurizer = QCGNFeaturizer()
-
-    # Print feature info
     info = featurizer.get_feature_info()
+    print(f"Node dim: {info['node_dim']} (Expected 34)")
+    print(f"Edge dim: {info['edge_dim']} (Expected 10)")
+
+    # Test Ablation: No BDE
     print("\n" + "="*60)
-    print("QC-GN Enhanced Featurizer (v4.4) Information")
-    print("="*60)
-    print(f"Node dimension: {info['node_dim']}")
-    print(f"Edge dimension: {info['edge_dim']}")
-    print(f"Atom types: {', '.join(info['atom_types'])}")
-    print(f"Edge features: {', '.join(info['edge_features'])}")
+    print("Testing Ablation: No BDE")
+    featurizer_no_bde = QCGNFeaturizer(use_bde=False)
+    info = featurizer_no_bde.get_feature_info()
+    print(f"Node dim: {info['node_dim']} (Expected 34)")
+    print(f"Edge dim: {info['edge_dim']} (Expected 9)")
 
-    # Test molecules
-    test_smiles = [
-        ("C[C@H](O)C(=O)O", "L-Lactic Acid (Chiral)"),
-        ("C/C=C/C", "Trans-2-Butene"),
-        ("C/C=C\C", "Cis-2-Butene"),
-    ]
-
+    # Test Ablation: No Bond Order
     print("\n" + "="*60)
-    print("Testing Molecules")
-    print("="*60)
+    print("Testing Ablation: No Bond Order")
+    featurizer_no_bo = QCGNFeaturizer(include_bond_order=False)
+    info = featurizer_no_bo.get_feature_info()
+    print(f"Node dim: {info['node_dim']} (Expected 34)")
+    print(f"Edge dim: {info['edge_dim']} (Expected 9)")
 
-    for smiles, name in test_smiles:
-        mol = Chem.MolFromSmiles(smiles)
-
-        is_valid, msg = featurizer.validate_molecule(mol)
-        print(f"\n{name}: {smiles}")
-        print(f"  Valid: {is_valid}")
-
-        # Node features
-        print(f"  Atoms: {mol.GetNumAtoms()}")
-        for i, atom in enumerate(mol.GetAtoms()):
-            features = featurizer.get_atom_features(atom)
-            # Check chiral feature (last 4 dims)
-            chiral_vec = features[-4:]
-            if chiral_vec.sum() > 0:
-                print(f"    Atom {i} ({atom.GetSymbol()}): Chiral={chiral_vec}")
-
-        # Edge features
-        print(f"  Bonds: {mol.GetNumBonds()}")
-        for i, bond in enumerate(mol.GetBonds()):
-            features = featurizer.get_edge_features(bond, bde_value=85.0)
-            # Check stereo feature (last 6 dims)
-            stereo_vec = features[-6:]
-            if stereo_vec[0] == 0: # If not STEREONONE
-                 print(f"    Bond {i}: Stereo={stereo_vec}")
+    # Test Ablation: No Chirality
+    print("\n" + "="*60)
+    print("Testing Ablation: No Chirality")
+    featurizer_no_chi = QCGNFeaturizer(include_chirality=False)
+    info = featurizer_no_chi.get_feature_info()
+    print(f"Node dim: {info['node_dim']} (Expected 30)")
+    print(f"Edge dim: {info['edge_dim']} (Expected 10)")
 
     print("\n" + "="*60)
     print("Test Complete!")
