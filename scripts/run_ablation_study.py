@@ -56,7 +56,7 @@ def run_experiment(
     base_args: List[str],
     log_dir: Path
 ) -> float:
-    """Run a single training experiment"""
+    """Run a single training experiment with output streaming"""
     logger.info(f"Running experiment: {config_name}")
 
     output_model = log_dir / f"model_{config_name}.pth"
@@ -72,29 +72,40 @@ def run_experiment(
 
     logger.info(f"Command: {' '.join(cmd)}")
 
+    full_log_output = ""
+
     try:
-        # Run command and capture output
-        result = subprocess.run(
+        # Run command and capture output continuously
+        process = subprocess.Popen(
             cmd,
-            check=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
+            stderr=subprocess.STDOUT, # Merge stderr into stdout
+            text=True,
+            bufsize=1 # Line buffered
         )
 
-        # Save log
         with open(log_file, "w") as f:
-            f.write(result.stdout)
+            for line in process.stdout:
+                sys.stdout.write(line) # Print to console
+                f.write(line) # Write to log file
+                full_log_output += line
+
+        process.wait()
+
+        if process.returncode != 0:
+             raise subprocess.CalledProcessError(process.returncode, cmd)
 
         # Parse result
-        best_cos = parse_best_cosine(result.stdout)
+        best_cos = parse_best_cosine(full_log_output)
         logger.info(f"  Result ({config_name}): {best_cos:.4f}")
         return best_cos
 
     except subprocess.CalledProcessError as e:
         logger.error(f"Experiment {config_name} failed!")
-        with open(log_file, "w") as f:
-            f.write(e.output)
+        # Log is already written to file and stdout
+        return 0.0
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
         return 0.0
 
 def plot_results(results: List[Tuple[str, float]], output_dir: Path):
