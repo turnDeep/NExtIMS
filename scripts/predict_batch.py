@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: Batch EI-MS Prediction
+NExtIMS v1.0: Batch EI-MS Prediction
 
 Predicts EI-MS spectra for multiple molecules from CSV file.
 
@@ -393,7 +393,7 @@ def print_summary(results: list[dict], total_time: float):
     avg_time = np.mean([r['inference_time_ms'] for r in results if r['status'] == 'success'])
 
     print("\n" + "=" * 70)
-    print("NExtIMS v4.2: Batch Prediction Summary")
+    print("NExtIMS v1.0: Batch Prediction Summary")
     print("=" * 70)
     print(f"Total molecules: {num_total:,}")
     print(f"Successful predictions: {num_success:,} ({num_success/num_total*100:.1f}%)")

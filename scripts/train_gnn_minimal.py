@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: Minimal GNN Training Script
+NExtIMS v1.0: Minimal GNN Training Script
 
 Trains QCGN2oEI_Minimal model on NIST17 EI-MS dataset with:
 - RAdam optimizer (lr=5e-5)
@@ -314,7 +314,7 @@ def main():
     args = parser.parse_args()
 
     logger.info("="*80)
-    logger.info("NExtIMS v4.2: Minimal GNN Training")
+    logger.info("NExtIMS v1.0: Minimal GNN Training")
     logger.info("="*80)
     logger.info(f"NIST MSP: {args.nist_msp}")
     logger.info(f"BDE cache: {args.bde_cache}")

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: BDE Pre-computation Script
+NExtIMS v1.0: BDE Pre-computation Script
 
 Pre-computes Bond Dissociation Energy (BDE) values for NIST17 EI-MS dataset
 using BonDNet, storing results in HDF5 cache for efficient training.
 
 This replaces the v2.0 PCQM4Mv2 pretraining approach with a direct NIST17
-BDE precomputation strategy suitable for the minimal v4.2 architecture.
+BDE precomputation strategy suitable for the minimal v1.0 architecture.
 
 Migration from v2.0:
     - Dataset: PCQM4Mv2 (3.74M molecules) → NIST17 (~300K compounds)
@@ -370,7 +370,7 @@ def main():
         sys.exit(1)
 
     logger.info("="*80)
-    logger.info("NExtIMS v4.2: BDE Pre-computation for NIST17")
+    logger.info("NExtIMS v1.0: BDE Pre-computation for NIST17")
     logger.info("="*80)
     logger.info(f"Input:  {args.nist_msp}")
     logger.info(f"Output: {args.output}")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # src/data/features_qcgn.py
 """
-NExtIMS v4.4: Stereochemistry & Scaled Architecture
+NExtIMS v1.0: Stereochemistry & Scaled Architecture
 
 Implements enhanced node and edge features with Stereochemistry:
 - Node features (34 dims):

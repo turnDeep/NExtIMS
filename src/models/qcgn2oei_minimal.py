@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # src/models/qcgn2oei_minimal.py
 """
-NExtIMS v4.2: QCGN2oEI_Minimal Model
+NExtIMS v1.0: QCGN2oEI_Minimal Model
 
 Quantum Chemistry-augmented Graph Neural Network for EI-MS prediction.
 Minimal configuration based on QC-GN2oMS2 architecture, adapted for EI-MS.

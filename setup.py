@@ -1,6 +1,6 @@
 # setup.py
 """
-NExtIMS v4.2 - Minimal Configuration EI-MS Prediction System
+NExtIMS v1.0 - Neural EI-MS Prediction System
 Setup configuration for package installation
 """
 
@@ -8,8 +8,8 @@ from setuptools import setup, find_packages
 import os
 
 # Version information
-VERSION = "4.2.0"
-DESCRIPTION = "NExtIMS v4.2 - Neural EI-MS Prediction with Minimal Configuration"
+VERSION = "1.0.0"
+DESCRIPTION = "NExtIMS v1.0 - Neural EI-MS Prediction System"
 
 # Read README
 with open("README.md", "r", encoding="utf-8") as f:
@@ -37,7 +37,7 @@ setup(
     package_dir={"": "src"},
     install_requires=requirements,
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Chemistry",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
