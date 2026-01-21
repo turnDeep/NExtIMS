@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: Single Molecule EI-MS Prediction
+NExtIMS v1.0: Single Molecule EI-MS Prediction
 
 Predicts EI-MS spectrum for a single molecule using QCGN2oEI_Minimal model.
 
@@ -346,7 +346,7 @@ def print_results(
         top_k: Number of top peaks to show
     """
     print("\n" + "=" * 70)
-    print("NExtIMS v4.2: Single Molecule Prediction Results")
+    print("NExtIMS v1.0: Single Molecule Prediction Results")
     print("=" * 70)
     print(f"SMILES: {metadata['smiles']}")
     print(f"Formula: {metadata['properties']['formula']}")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: BonDNet Retraining on BDE-db2 with Transfer Learning and HDF5 Support
+NExtIMS v1.0: BonDNet Retraining on BDE-db2 with Transfer Learning and HDF5 Support
 
 Refactored to support memory-efficient HDF5 data loading.
 """

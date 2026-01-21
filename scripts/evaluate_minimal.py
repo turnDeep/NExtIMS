@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NExtIMS v4.2: Comprehensive Model Evaluation Script
+NExtIMS v1.0: Comprehensive Model Evaluation Script
 
 Evaluates QCGN2oEI_Minimal model on NIST17 test set with:
 - Cosine similarity metric
@@ -556,7 +556,7 @@ class ModelEvaluator:
         cosine_sim = metrics['cosine_similarity']
         if cosine_sim >= 0.85:
             assessment = "EXCELLENT"
-            recommendation = "Adopt v4.2 minimal configuration. No feature expansion needed."
+            recommendation = "Adopt v1.0 configuration. No feature expansion needed."
         elif cosine_sim >= 0.80:
             assessment = "GOOD"
             recommendation = "Consider minor feature additions. Proceed to Phase 4 for targeted expansion."
@@ -623,7 +623,7 @@ class ModelEvaluator:
 
         if cosine_sim >= 0.85:
             print("✅ EXCELLENT: Cosine Similarity >= 0.85")
-            print("   Recommendation: Adopt v4.2 minimal configuration!")
+            print("   Recommendation: Adopt v1.0 configuration!")
             print("   No feature expansion needed.")
         elif cosine_sim >= 0.80:
             print("⚠️  GOOD: Cosine Similarity 0.80-0.85")
