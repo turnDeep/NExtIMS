@@ -17,6 +17,7 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 import logging
+import torch
 from pathlib import Path
 from typing import List, Tuple, Dict
 
@@ -43,12 +44,14 @@ CONFIGURATIONS = [
     ("-AtomType", ["--no-atom-type"]),
 ]
 
-def parse_best_cosine(log_output: str) -> float:
-    """Extract best validation cosine similarity from log output"""
-    match = re.search(r"Best validation cosine similarity: ([0-9.]+)", log_output)
-    if match:
-        return float(match.group(1))
-    return 0.0
+def get_score_from_checkpoint(model_path: Path) -> float:
+    """Load the model checkpoint and return the best validation cosine similarity"""
+    try:
+        checkpoint = torch.load(model_path, map_location='cpu')
+        return checkpoint.get('val_cosine_sim', 0.0)
+    except Exception as e:
+        logger.error(f"Failed to load checkpoint {model_path}: {e}")
+        return 0.0
 
 def run_experiment(
     config_name: str,
@@ -61,6 +64,21 @@ def run_experiment(
 
     output_model = log_dir / f"model_{config_name}.pth"
     log_file = log_dir / f"log_{config_name}.txt"
+
+    # Check if model already exists
+    if output_model.exists():
+        # Ask user if they want to reuse the existing model
+        print(f"Model for {config_name} already exists at {output_model}.")
+        response = input("Do you want to use the existing model? (yes/no): ").strip().lower()
+
+        if response in ['yes', 'y']:
+            logger.info(f"Using existing model for {config_name}")
+            return get_score_from_checkpoint(output_model)
+        elif response in ['no', 'n']:
+            logger.info(f"Overwriting existing model for {config_name}")
+        else:
+            logger.warning("Invalid response. Defaulting to 'yes' (using existing model).")
+            return get_score_from_checkpoint(output_model)
 
     cmd = [
         "python3", "scripts/train_gnn_minimal.py",
@@ -95,10 +113,14 @@ def run_experiment(
         if process.returncode != 0:
              raise subprocess.CalledProcessError(process.returncode, cmd)
 
-        # Parse result
-        best_cos = parse_best_cosine(full_log_output)
-        logger.info(f"  Result ({config_name}): {best_cos:.4f}")
-        return best_cos
+        # Get score from the saved checkpoint (most reliable)
+        if output_model.exists():
+            best_cos = get_score_from_checkpoint(output_model)
+            logger.info(f"  Result ({config_name}): {best_cos:.4f}")
+            return best_cos
+        else:
+            logger.error(f"Model file not found after training: {output_model}")
+            return 0.0
 
     except subprocess.CalledProcessError as e:
         logger.error(f"Experiment {config_name} failed!")
