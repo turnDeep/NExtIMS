@@ -186,3 +186,16 @@ docker run --rm -v open-webui:/volume -v /mnt/c/docker_backup:/backup ubuntu bas
     *   `docker-compose.yml` があるディレクトリに移動し、`docker compose up -d` で起動します。
     *   ボリューム（`ollama`, `open-webui`）が正しく復元・マウントされていれば、以前ダウンロードしたLLMモデルやチャット履歴がそのまま利用可能です。
     *   GPUが認識されているか確認するには、Ollama起動中にログを確認するか、`docker exec -it <ollamaのコンテナID> nvidia-smi` を実行してください。
+
+---
+
+## Windowsブラウザからのアクセスについて
+
+Docker Engine on WSL2で起動したコンテナ（OllamaやOpenWebUIなど）は、**Windows側のブラウザから `localhost` 経由でそのままアクセス可能**です。
+
+*   例えば、OpenWebUIがポート `3000` で動いている場合、WindowsのChromeやEdgeで `http://localhost:3000` にアクセスすれば開けます。
+*   WSL2が自動的にポート転送を行うため、特別な設定は不要です。
+*   もしアクセスできない場合は、以下の点を確認してください：
+    1.  コンテナが正しく起動しているか (`docker ps`)
+    2.  `docker-compose.yml` で `ports` の設定が正しいか（例: `"3000:8080"`）
+    3.  Windowsのファイアウォール設定（稀にブロックされることがありますが、通常は自動的に許可されます）
