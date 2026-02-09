@@ -199,3 +199,82 @@ Docker Engine on WSL2で起動したコンテナ（OllamaやOpenWebUIなど）�
     1.  コンテナが正しく起動しているか (`docker ps`)
     2.  `docker-compose.yml` で `ports` の設定が正しいか（例: `"3000:8080"`）
     3.  Windowsのファイアウォール設定（稀にブロックされることがありますが、通常は自動的に許可されます）
+
+---
+
+## オフライン環境でのインストール手順
+
+インターネットに接続できないPC（オフラインPC）にインストールする場合、**インターネットに接続できる別のPC（オンラインPC）でインストーラー（.debファイル）をダウンロードし、USBメモリ等でオフラインPCに移動させる**必要があります。
+
+ここでは、**オンラインPC上でWSL2 (Ubuntu) を使って必要なファイルをダウンロードする方法**を説明します。
+（オンラインPCがWindowsのみの場合でも、WSL2をインストールして行うのが最も確実です）
+
+### Step A: オンラインPCでのファイルダウンロード
+
+オンラインPCのWSL2ターミナルで以下のコマンドを実行し、必要なパッケージをすべてダウンロードします。
+
+#### 1. 準備
+作業用ディレクトリを作成します。
+```bash
+mkdir -p ~/docker-offline
+cd ~/docker-offline
+```
+
+#### 2. Docker Engine関連のダウンロード
+Docker公式リポジトリを追加してからダウンロードします。
+```bash
+# GPGキーとリポジトリの追加（まだの場合）
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+# パッケージのダウンロード
+# docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin
+apt-get download docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+#### 3. NVIDIA Container Toolkit関連のダウンロード
+NVIDIA公式リポジトリを追加してからダウンロードします。
+```bash
+# リポジトリ設定（まだの場合）
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update
+
+# パッケージのダウンロード
+# nvidia-container-toolkit, nvidia-container-toolkit-base, libnvidia-container-tools, libnvidia-container1
+apt-get download nvidia-container-toolkit nvidia-container-toolkit-base libnvidia-container-tools libnvidia-container1
+```
+※ 依存関係のエラーが出る場合は、`apt-cache depends <パッケージ名>` で不足している依存パッケージを確認し、それらも `apt-get download` してください。
+
+### Step B: ファイルの移動
+
+`~/docker-offline` ディレクトリにダウンロードされた `.deb` ファイル群（合計10個程度）と、Step 1で作成したバックアップ（イメージとボリュームの `.tar` ファイル）をUSBメモリなどにコピーします。
+
+Windows側からWSL2のファイルにアクセスするには、エクスプローラーのアドレスバーに `\\wsl$\Ubuntu\home\ユーザー名\docker-offline` と入力します。
+
+### Step C: オフラインPCでのインストール
+
+オフラインPCのWSL2にファイルを移動し、インストールを行います。
+
+1.  ファイルをオフラインPCのWSL2上の適当なフォルダ（例: `~/install-files`）にコピーします。
+2.  そのディレクトリに移動してインストールを実行します。
+
+```bash
+cd ~/install-files
+sudo dpkg -i *.deb
+```
+
+3.  もし依存関係のエラーが出た場合（例: `libc6` や `iptables` など標準ライブラリのバージョン違いなど）、エラーメッセージを確認して不足しているパッケージをオンラインPCで追加ダウンロードしてくる必要があります。
+4.  インストール完了後、NVIDIAの設定を行います。
+    ```bash
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
+    ```
+5.  最後に、Step 4の手順に従ってイメージとボリュームをリストアしてください。
