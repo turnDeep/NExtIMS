@@ -350,3 +350,67 @@ OllamaはDockerコンテナ内で動作しているため、ファイルをコ�
     ```
 
 これで、`ollama run gemma-3-27b` や Open WebUI からこのモデルを選択できるようになります。
+
+---
+
+## オフライン環境でのVSCode & Dev Containers導入
+
+オフラインPCでVSCodeの「Remote - WSL」や「Dev Containers」機能を使用するには、VSCode本体と拡張機能に加え、通常は自動ダウンロードされる**VS Code Server**を手動で導入する必要があります。
+
+### Step 1: 必要なファイルのダウンロード (オンラインPC)
+
+オンラインPCで以下のファイルを準備します。
+
+1.  **VSCode本体 (Windows版)**
+    公式サイトから `System Installer` または `User Installer` (x64) をダウンロードします。
+
+2.  **拡張ファイル (.vsix)**
+    Marketplaceの各ページ右側にある「Download Extension」リンクからダウンロードします。
+    *   **WSL**: `ms-vscode-remote.remote-wsl`
+    *   **Dev Containers**: `ms-vscode-remote.remote-containers`
+    *   **Docker**: `ms-azuretools.vscode-docker`
+
+3.  **VS Code Server (重要)**
+    VSCodeがWSLに接続する際に必要なサーバープログラムです。これは**使用するVSCodeのバージョン（Commit ID）と完全に一致する必要があります**。
+
+    *   **Commit IDの確認方法**:
+        オンラインPCにダウンロードしたVSCodeを一時的にインストールするか、インストーラーのプロパティ詳細等からバージョンを確認し、Web検索で「VSCode <バージョン> commit id」と検索して特定します。（または、オフラインPCにVSCodeをインストールした後、ヘルプ > バージョン情報 から確認します）
+
+    *   **ダウンロード**:
+        以下のURLの `<COMMIT_ID>` 部分を実際のID（40桁の英数字）に置き換えてダウンロードします。
+        `https://update.code.visualstudio.com/commit:<COMMIT_ID>/server-linux-x64/stable`
+        ファイル名: `vscode-server-linux-x64.tar.gz`
+
+### Step 2: インストールと配置 (オフラインPC)
+
+ファイルをオフラインPCに移動し、以下の手順でセットアップします。
+
+1.  **VSCodeと拡張機能のインストール**
+    *   VSCode本体をインストールします。
+    *   コマンドプロンプト等で拡張機能をインストールします（またはVSCode上の「VSIXからインストール」メニューを使用）。
+        ```powershell
+        code --install-extension ms-vscode-remote.remote-wsl.vsix
+        code --install-extension ms-vscode-remote.remote-containers.vsix
+        code --install-extension ms-azuretools.vscode-docker.vsix
+        ```
+
+2.  **VS Code Serverの手動配置 (WSL側)**
+    WSL2 (Ubuntu) を起動し、ダウンロードした `vscode-server-linux-x64.tar.gz` を以下の場所に展開します。
+
+    ```bash
+    # Commit IDを変数にセット (例: a1b2c3...)
+    COMMIT_ID="<確認したCommit ID>"
+
+    # ディレクトリ作成
+    mkdir -p ~/.vscode-server/bin/${COMMIT_ID}
+
+    # 展開 (tar.gzがある場所で実行)
+    tar -xzf vscode-server-linux-x64.tar.gz -C ~/.vscode-server/bin/${COMMIT_ID} --strip-components=1
+
+    # インストール完了マーカーの作成
+    touch ~/.vscode-server/bin/${COMMIT_ID}/0
+    ```
+
+3.  **接続確認**
+    VSCodeを開き、左下の緑色のボタンから「New Window using Distro...」を選択してWSLに接続できるか確認します。
+    接続できれば、Dev Containersも利用可能です。
