@@ -278,3 +278,75 @@ sudo dpkg -i *.deb
     sudo systemctl restart docker
     ```
 5.  最後に、Step 4の手順に従ってイメージとボリュームをリストアしてください。
+
+---
+
+## オフライン環境でのOllamaモデル追加 (GGUF)
+
+Hugging Face等からダウンロードしたGGUFファイル（`.gguf`）をオフライン環境のOllamaに追加する手順です。
+例として `gemma-3-27b-it` を使用します。
+
+### Step 1: モデルファイルのダウンロード (オンラインPC)
+
+オンラインPCで、以下のURLなどからGGUFファイルをダウンロードします。
+URL: https://huggingface.co/unsloth/gemma-3-27b-it-GGUF
+
+**GPU VRAMに応じたファイルの選択目安:**
+*   **VRAM 24GB以上** (RTX 3090/4090等): `Q4_K_M` (約16.5GB) が推奨です。品質と速度のバランスが良いです。
+*   **VRAM 16GB以下**: `Q4_K_M` は動作が厳しい（またはコンテキストサイズが取れない）可能性があります。`Q3_K_M` や `Q2_K` を検討するか、一部CPUオフロードを許容する必要があります。
+
+ダウンロードした `.gguf` ファイルをUSBメモリ等でオフラインPCのWSL2へ移動させてください（例: `~/models/gemma-3-27b-it-Q4_K_M.gguf`）。
+
+### Step 2: Modelfileの作成 (オフラインPC)
+
+WSL2上で、モデルと同じディレクトリに `Modelfile` という名前のテキストファイルを作成します。
+
+```bash
+cd ~/models
+nano Modelfile
+```
+
+中身は以下の一行だけでOKです。**Dockerコンテナ内のパスを指定するため、`/root/` を付けます。**
+```dockerfile
+FROM /root/gemma-3-27b-it-Q4_K_M.gguf
+```
+※ ファイル名は実際にダウンロードしたものに合わせてください。
+
+### Step 3: Ollamaコンテナへの取り込み
+
+OllamaはDockerコンテナ内で動作しているため、ファイルをコンテナ内に転送してからコマンドを実行します。
+
+1.  **コンテナ名の確認**
+    ```bash
+    docker ps
+    ```
+    `IMAGE` が `ollama/ollama` となっているコンテナの `NAMES` を確認します（例: `ollama`）。
+
+2.  **ファイルの転送**
+    GGUFファイルとModelfileをコンテナ内の `/root` ディレクトリにコピーします。
+    ```bash
+    # docker cp <ローカルファイルパス> <コンテナ名>:<コンテナ内パス>
+    # (例: コンテナ名が "ollama" の場合)
+    docker cp gemma-3-27b-it-Q4_K_M.gguf ollama:/root/
+    docker cp Modelfile ollama:/root/
+    ```
+
+3.  **モデルの作成実行**
+    コンテナ内で `ollama create` コマンドを実行します。
+    ```bash
+    docker exec -it ollama ollama create gemma-3-27b -f /root/Modelfile
+    ```
+    処理が完了すると `success` と表示されます。
+
+4.  **確認**
+    ```bash
+    docker exec -it ollama ollama list
+    ```
+
+5.  **後片付け（推奨）**
+    コンテナ内にコピーしたGGUFファイルは、取り込み完了後は不要になるため削除してディスク容量を空けます。
+    ```bash
+    docker exec -it ollama rm /root/gemma-3-27b-it-Q4_K_M.gguf /root/Modelfile
+    ```
+
+これで、`ollama run gemma-3-27b` や Open WebUI からこのモデルを選択できるようになります。
