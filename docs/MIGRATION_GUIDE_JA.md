@@ -424,3 +424,39 @@ OllamaはDockerコンテナ内で動作しているため、ファイルをコ�
 3.  **接続確認**
     VSCodeを開き、左下の緑色のボタンから「New Window using Distro...」を選択してWSLに接続できるか確認します。
     接続できれば、Dev Containersも利用可能です。
+
+---
+
+## Step 6: Dev Containersで既存イメージを使用する場合 (ビルドの回避)
+
+VSCodeで「Reopen in Container」を選択すると、通常は `devcontainer.json` の設定に従って Dockerfile からイメージをビルドしようとします。
+移行した既存のイメージ（`docker load` で読み込んだもの）をそのまま使用したい場合は、`devcontainer.json` を少し書き換える必要があります。
+
+### 手順
+
+1.  **読み込んだイメージ名の確認**
+    ```bash
+    docker images
+    ```
+    使いたいイメージの `REPOSITORY` と `TAG` を確認します（例: `nextims:latest`）。
+
+2.  **devcontainer.json の編集**
+    プロジェクト内の `.devcontainer/devcontainer.json` を開きます。
+    `"build": { ... }` と書かれている部分を削除し、代わりに `"image": "イメージ名:タグ"` を記述します。
+
+    **変更前（例）:**
+    ```json
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    ```
+
+    **変更後（例）:**
+    ```json
+    "image": "nextims:latest",
+    // "build": { ... } は削除またはコメントアウト
+    ```
+
+3.  **再度 Reopen**
+    VSCodeのコマンドパレット（F1）から `Dev Containers: Rebuild and Reopen in Container` を実行すると、ビルド処理がスキップされ、指定したイメージがそのまま使用されます。
