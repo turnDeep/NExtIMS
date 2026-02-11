@@ -152,6 +152,16 @@ docker volume create open-webui
 docker run --rm -v open-webui:/volume -v /mnt/c/docker_backup:/backup ubuntu bash -c "cd /volume && tar xvf /backup/backup_openwebui.tar --strip-components=1"
 ```
 
+### 3. コンテナの起動 (リストアの完了)
+イメージとボリュームの準備ができたら、最後にコンテナを起動して完了です。
+`docker-compose.yml` ファイルがあるディレクトリ（例: `~/projects/ollama-openwebui`）に移動し、以下のコマンドを実行します。
+
+```bash
+cd ~/projects/ollama-openwebui  # 実際のパスに合わせてください
+docker compose up -d
+```
+これにより、復元したイメージとボリュームを使ってコンテナが立ち上がります。もし `docker-compose.yml` がない場合は、`docker run` コマンドでボリュームをマウントして起動してください。
+
 ---
 
 ## Step 5: VSCodeと各リポジトリの対応
