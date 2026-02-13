@@ -378,7 +378,8 @@ OllamaはDockerコンテナ内で動作しているため、ファイルをコ�
     Marketplaceの各ページ右側にある「Download Extension」リンクからダウンロードします。
     *   **WSL**: `ms-vscode-remote.remote-wsl`
     *   **Dev Containers**: `ms-vscode-remote.remote-containers`
-    *   **Docker**: `ms-azuretools.vscode-docker`
+    *   **Docker** (推奨): `ms-azuretools.vscode-docker`
+        ※ 必須ではありませんが、コンテナやイメージのGUI管理に非常に便利です。
 
 3.  **VS Code Server (重要)**
     VSCodeがWSLに接続する際に必要なサーバープログラムです。これは**使用するVSCodeのバージョン（Commit ID）と完全に一致する必要があります**。
@@ -459,4 +460,5 @@ VSCodeで「Reopen in Container」を選択すると、通常は `devcontainer.j
     ```
 
 3.  **再度 Reopen**
-    VSCodeのコマンドパレット（F1）から `Dev Containers: Rebuild and Reopen in Container` を実行すると、ビルド処理がスキップされ、指定したイメージがそのまま使用されます。
+    VSCodeのコマンドパレット（F1）から **`Dev Containers: Rebuild Container`** を実行すると、ビルド処理がスキップされ、指定したイメージがそのまま使用されます。
+    （または、現在コンテナで開いていない場合は左下の緑色のボタンから `Dev Containers: Reopen in Container` を選択します）
