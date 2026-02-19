@@ -51,29 +51,29 @@ class QCGN2oEI_Minimal(nn.Module):
     - Node features: 16-dim (QC-GN2oMS2) → 34-dim (v4.4)
     - Edge features: 2-dim (QC-GN2oMS2) → 10-dim (v4.4, adds BDE + stereo)
     - Output: Variable m/z → Fixed m/z 1-1000
-    - Hidden dim: 128 (QC-GN2oMS2) → 768 (v5.1 Scaled)
+    - Hidden dim: 128 (QC-GN2oMS2) → 1024 (v5.2 High-Performance)
     """
 
     def __init__(
         self,
         node_dim: int = 34,
         edge_dim: int = 10,
-        hidden_dim: int = 768,
-        num_layers: int = 14,
-        num_heads: int = 24,
+        hidden_dim: int = 1024,
+        num_layers: int = 20,
+        num_heads: int = 32,
         output_dim: int = 1000,
         dropout: float = 0.1,
         use_edge_attr: bool = True
     ):
         """
-        Initialize QCGN2oEI_Minimal model (v5.1 Scaled)
+        Initialize QCGN2oEI_Minimal model (v5.2 High-Performance)
 
         Args:
             node_dim: Node feature dimension (default: 34 for v4.4)
             edge_dim: Edge feature dimension (default: 10 for v4.4)
-            hidden_dim: Hidden dimension (default: 768)
-            num_layers: Number of GATv2 layers (default: 14)
-            num_heads: Number of attention heads (default: 24)
+            hidden_dim: Hidden dimension (default: 1024)
+            num_layers: Number of GATv2 layers (default: 20)
+            num_heads: Number of attention heads (default: 32)
             output_dim: Output spectrum dimension (default: 1000 for m/z 1-1000)
             dropout: Dropout rate (default: 0.1)
             use_edge_attr: Whether to use edge attributes (default: True)
