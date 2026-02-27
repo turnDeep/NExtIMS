@@ -79,8 +79,8 @@ class ModelEvaluator:
         device: str = "cuda",
         node_dim: int = 34,
         edge_dim: int = 10,
-        hidden_dim: int = 1024,
-        num_layers: int = 20,
+        hidden_dim: int = 1280,
+        num_layers: int = 16,
         num_heads: int = 32,
         output_dim: int = 1000
     ):

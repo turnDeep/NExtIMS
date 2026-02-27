@@ -51,28 +51,28 @@ class QCGN2oEI_Minimal(nn.Module):
     - Node features: 16-dim (QC-GN2oMS2) → 34-dim (v4.4)
     - Edge features: 2-dim (QC-GN2oMS2) → 10-dim (v4.4, adds BDE + stereo)
     - Output: Variable m/z → Fixed m/z 1-1000
-    - Hidden dim: 128 (QC-GN2oMS2) → 1024 (v5.2 High-Performance)
+    - Hidden dim: 128 (QC-GN2oMS2) → 1280 (v5.3 Ultra-Wide)
     """
 
     def __init__(
         self,
         node_dim: int = 34,
         edge_dim: int = 10,
-        hidden_dim: int = 1024,
-        num_layers: int = 20,
+        hidden_dim: int = 1280,
+        num_layers: int = 16,
         num_heads: int = 32,
         output_dim: int = 1000,
         dropout: float = 0.1,
         use_edge_attr: bool = True
     ):
         """
-        Initialize QCGN2oEI_Minimal model (v5.2 High-Performance)
+        Initialize QCGN2oEI_Minimal model (v5.3 Ultra-Wide)
 
         Args:
             node_dim: Node feature dimension (default: 34 for v4.4)
             edge_dim: Edge feature dimension (default: 10 for v4.4)
-            hidden_dim: Hidden dimension (default: 1024)
-            num_layers: Number of GATv2 layers (default: 20)
+            hidden_dim: Hidden dimension (default: 1280)
+            num_layers: Number of GATv2 layers (default: 16)
             num_heads: Number of attention heads (default: 32)
             output_dim: Output spectrum dimension (default: 1000 for m/z 1-1000)
             dropout: Dropout rate (default: 0.1)
@@ -109,6 +109,7 @@ class QCGN2oEI_Minimal(nn.Module):
         # GATv2Conv layers with residual connections
         self.gat_layers = nn.ModuleList()
         self.residual_layers = nn.ModuleList()
+        self.layer_norms = nn.ModuleList()
 
         for i in range(num_layers):
             # GATv2Conv layer
@@ -127,6 +128,11 @@ class QCGN2oEI_Minimal(nn.Module):
             # Residual projection layer
             self.residual_layers.append(
                 nn.Linear(hidden_dim, hidden_dim)
+            )
+
+            # Layer Normalization
+            self.layer_norms.append(
+                nn.LayerNorm(hidden_dim)
             )
 
         # Global pooling
@@ -204,6 +210,9 @@ class QCGN2oEI_Minimal(nn.Module):
             # Residual connection with projection
             # Following QC-GN2oMS2: output = ELU(GATv2(x) + Linear(residual))
             x = F.elu(x + self.residual_layers[i](residual))
+
+            # Apply LayerNorm
+            x = self.layer_norms[i](x)
 
             # Dropout
             x = F.dropout(x, p=self.dropout, training=self.training)
