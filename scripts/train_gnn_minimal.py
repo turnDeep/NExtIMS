@@ -192,6 +192,10 @@ def train_epoch(
 
         # Backward pass
         loss.backward()
+
+        # Gradient Clipping (Prevents Exploding Gradients)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         optimizer.step()
 
         # Compute cosine similarity for monitoring
@@ -292,12 +296,12 @@ def main():
                         help='Batch size (default: 32 for RTX 5070 Ti)')
     parser.add_argument('--lr', type=float, default=5e-5,
                         help='Learning rate (default: 5e-5)')
-    parser.add_argument('--hidden-dim', type=int, default=768,
-                        help='Hidden dimension (default: 768)')
-    parser.add_argument('--num-layers', type=int, default=14,
-                        help='Number of GATv2 layers (default: 14)')
-    parser.add_argument('--num-heads', type=int, default=24,
-                        help='Number of attention heads (default: 24)')
+    parser.add_argument('--hidden-dim', type=int, default=1280,
+                        help='Hidden dimension (default: 1280)')
+    parser.add_argument('--num-layers', type=int, default=16,
+                        help='Number of GATv2 layers (default: 16)')
+    parser.add_argument('--num-heads', type=int, default=32,
+                        help='Number of attention heads (default: 32)')
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='Dropout rate (default: 0.1)')
     parser.add_argument('--max-samples', type=int, default=0,
