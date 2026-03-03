@@ -22,7 +22,7 @@ Design Philosophy (v4.2):
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import numpy as np
 import torch
@@ -71,7 +71,8 @@ class MinimalGraphGenerator:
         bondnet_model: Optional[str] = "bdncm/20200808",
         bde_min: float = 50.0,
         bde_max: float = 200.0,
-        default_bde: float = 85.0
+        default_bde: float = 85.0,
+        **featurizer_kwargs: Any
     ):
         """
         Initialize minimal graph generator
@@ -83,6 +84,7 @@ class MinimalGraphGenerator:
             bde_min: Minimum BDE for normalization (kcal/mol)
             bde_max: Maximum BDE for normalization (kcal/mol)
             default_bde: Default BDE if cache miss and no calculator
+            **featurizer_kwargs: Arguments passed to QCGNFeaturizer
         """
         self.bde_min = bde_min
         self.bde_max = bde_max
@@ -90,9 +92,9 @@ class MinimalGraphGenerator:
 
         # Initialize featurizer
         self.featurizer = QCGNFeaturizer(
-            use_bde=True,
             bde_min=bde_min,
-            bde_max=bde_max
+            bde_max=bde_max,
+            **featurizer_kwargs
         )
 
         # Initialize BDE cache
@@ -200,8 +202,10 @@ class MinimalGraphGenerator:
         if smiles is None:
             smiles = Chem.MolToSmiles(mol)
 
-        # Get BDE values
-        bde_dict = self.get_bde_for_molecule(mol, smiles)
+        # Get BDE values (Only if BDE feature is enabled)
+        bde_dict = {}
+        if self.featurizer.use_bde:
+            bde_dict = self.get_bde_for_molecule(mol, smiles)
 
         # Node features (16-dim)
         node_features = []
