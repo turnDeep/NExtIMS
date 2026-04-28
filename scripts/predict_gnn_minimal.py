@@ -16,7 +16,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 from rdkit import Chem
+from rdkit.Chem import Descriptors
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
@@ -212,6 +214,80 @@ def predict_spectrum(
             else:
                 act_stats_out[key] = value
     return spectrum_np, act_stats_out
+def visualize_spectrum(
+    spectrum: np.ndarray,
+    smiles: str,
+    output_path: str,
+    mz_range: tuple[int, int] = (1, 1000),
+    figsize: tuple[int, int] = (12, 6),
+    dpi: int = 300
+):
+    """
+    Visualize predicted spectrum (same format as legacy script).
+    """
+    mz_values = np.arange(mz_range[0], mz_range[0] + len(spectrum))
+
+    # Normalize to Relative Intensity (0-100%)
+    max_intensity = spectrum.max()
+    if max_intensity > 0:
+        spectrum = (spectrum / max_intensity) * 100.0
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Stem plot for spectrum
+    markerline, stemlines, baseline = ax.stem(
+        mz_values,
+        spectrum,
+        linefmt='b-',
+        markerfmt=' ',  # No markers
+        basefmt=' '
+    )
+    stemlines.set_linewidth(0.5)
+
+    ax.set_xlabel("m/z", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Relative Intensity (%)", fontsize=12, fontweight='bold')
+    ax.set_title(f"Predicted EI-MS Spectrum\n{smiles}", fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, linestyle='--')
+
+    # Try to set x-axis limit based on molecular weight
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        mw = Descriptors.MolWt(mol)
+        ax.set_xlim(0, mw + 50)
+    except Exception:
+        ax.set_xlim(mz_range)
+
+    ax.set_ylim(0, 110)
+
+    # Annotate Top 10 peaks
+    top_indices = np.argsort(spectrum)[::-1]
+    count = 0
+    for idx in top_indices:
+        if count >= 10:
+            break
+
+        intensity = spectrum[idx]
+        if intensity < 0.1:  # Skip noise (0.1%)
+            continue
+
+        mz = idx + mz_range[0]
+
+        ax.text(
+            mz,
+            intensity + 1,
+            f"{int(mz)}",
+            ha='center',
+            va='bottom',
+            fontsize=9
+        )
+        count += 1
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight')
+    plt.close(fig)
+
+
 def get_top_peaks(
     spectrum: np.ndarray,
     top_k: int = 20,
@@ -318,6 +394,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Optional path to save top peaks CSV",
+    )
+    parser.add_argument(
+        "--output-image",
+        type=str,
+        default=None,
+        help="Optional path to save predicted spectrum plot image (e.g., predicted.png)",
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="If set, saves spectrum image. Will save to 'predicted_spectrum.png' if --output-image is not provided.",
     )
     parser.add_argument(
         "--refinement-steps",
@@ -428,6 +515,16 @@ def main():
     if args.output_peaks is not None:
         save_top_peaks_csv(args.output_peaks, peaks)
         print(f"Saved top peaks: {args.output_peaks}")
+
+    if args.visualize or args.output_image is not None:
+        image_path = args.output_image if args.output_image is not None else "predicted_spectrum.png"
+        visualize_spectrum(
+            spectrum=spectrum,
+            smiles=args.smiles,
+            output_path=image_path
+        )
+        print(f"Saved spectrum image: {image_path}")
+
     print("=" * 80)
 if __name__ == "__main__":
     main()
