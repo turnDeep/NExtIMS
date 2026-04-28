@@ -126,14 +126,16 @@ python scripts/evaluate_minimal.py \
 ### 推論
 
 ```bash
-# ACT搭載モデルによる単一分子予測（デフォルト設定での推論）
+# ACT搭載モデルによる単一分子予測（画像出力付き）
 python scripts/predict_gnn_minimal.py \
     --checkpoint models/qcgn2oei_stable_act_refine.pth \
     --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
     --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
     --top-k 20 \
     --output-spectrum outputs/pred_spectrum.csv \
-    --output-peaks outputs/top_peaks.csv
+    --output-peaks outputs/top_peaks.csv \
+    --visualize \
+    --output-image outputs/predicted.png
 
 # 学習時4loop、推論時8loopでの確認（※学習時に refinement-max-steps=8 以上を指定している必要があります）
 python scripts/predict_gnn_minimal.py \
