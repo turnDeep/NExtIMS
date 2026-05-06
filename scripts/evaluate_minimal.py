@@ -105,43 +105,49 @@ class ModelEvaluator:
         checkpoint = torch.load(model_path, map_location=self.device)
 
         # Load args from checkpoint if available
-        ckpt_args = checkpoint.get('args', {})
-        if 'node_dim' in ckpt_args:
-             node_dim = ckpt_args['node_dim']
-        if 'edge_dim' in ckpt_args:
-             edge_dim = ckpt_args['edge_dim']
-        if 'hidden_dim' in ckpt_args:
-             hidden_dim = ckpt_args['hidden_dim']
-        if 'num_layers' in ckpt_args:
-             num_layers = ckpt_args['num_layers']
-        if 'num_heads' in ckpt_args:
-             num_heads = ckpt_args['num_heads']
+        model_info = checkpoint.get("model_info", {})
+        ckpt_args = checkpoint.get("args", {})
 
-        self.model = QCGN2oEI_Minimal(
-            node_dim=node_dim,
-            edge_dim=edge_dim,
-            hidden_dim=hidden_dim,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            output_dim=output_dim,
-            dropout=0.1
-        )
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        def pick(name: str, default):
+            if name in model_info: return model_info[name]
+            if name in ckpt_args: return ckpt_args[name]
+            return default
+
+        self.config = {
+            "node_dim": int(pick("node_dim", node_dim)),
+            "edge_dim": int(pick("edge_dim", edge_dim)),
+            "hidden_dim": int(pick("hidden_dim", hidden_dim)),
+            "num_layers": int(pick("num_layers", num_layers)),
+            "num_heads": int(pick("num_heads", num_heads)),
+            "output_dim": int(pick("output_dim", output_dim)),
+            "dropout": float(pick("dropout", 0.0)),
+            "use_edge_attr": bool(pick("use_edge_attr", True)),
+            "use_recurrent_refinement": bool(pick("use_recurrent_refinement", False)),
+            "refinement_steps": int(pick("refinement_steps", 4)),
+            "refinement_max_steps": int(pick("refinement_max_steps", 8)),
+            "refinement_dropout": float(pick("refinement_dropout", 0.0)),
+            "use_lti_stabilization": bool(pick("use_lti_stabilization", True)),
+            "use_loop_embedding": bool(pick("use_loop_embedding", True)),
+            "use_act": bool(pick("use_act", False)),
+            "act_epsilon": float(pick("act_epsilon", 0.01)),
+            "act_loss_weight": float(pick("act_loss_weight", 0.0)),
+        }
+
+        self.model = QCGN2oEI_Minimal(**self.config)
+
+        missing, unexpected = self.model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        if missing:
+            logger.warning("Missing keys when loading state_dict:")
+            for key in missing: logger.warning(f"  missing: {key}")
+        if unexpected:
+            logger.warning("Unexpected keys when loading state_dict:")
+            for key in unexpected: logger.warning(f"  unexpected: {key}")
+
         self.model.to(self.device)
         self.model.eval()
 
         logger.info(f"Model loaded successfully on {self.device}")
         logger.info(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
-
-        # Store model config
-        self.config = {
-            'node_dim': node_dim,
-            'edge_dim': edge_dim,
-            'hidden_dim': hidden_dim,
-            'num_layers': num_layers,
-            'num_heads': num_heads,
-            'output_dim': output_dim
-        }
 
     @staticmethod
     def cosine_similarity_metric(pred: np.ndarray, target: np.ndarray) -> float:
@@ -281,8 +287,13 @@ class ModelEvaluator:
                     x=batch_graph.x,
                     edge_index=batch_graph.edge_index,
                     edge_attr=batch_graph.edge_attr,
-                    batch=batch_graph.batch
+                    batch=batch_graph.batch,
+                    refinement_steps=self.config.get("refinement_steps"),
+                    return_act_stats=False,
+                    force_no_act=True # force no act during typical batch evaluation for consistent behavior unless explicitly handled
                 )
+                if isinstance(pred, tuple):
+                    pred = pred[0]
             inference_time = time.time() - start_time
             inference_times.append(inference_time / len(graphs))  # Per-sample time
 
@@ -407,7 +418,9 @@ class ModelEvaluator:
                         x=batch.x,
                         edge_index=batch.edge_index,
                         edge_attr=batch.edge_attr,
-                        batch=batch.batch
+                        batch=batch.batch,
+                        refinement_steps=self.config.get("refinement_steps"),
+                        force_no_act=True
                     )
 
                 if torch.cuda.is_available():
