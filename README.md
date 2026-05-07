@@ -115,9 +115,9 @@ python scripts/train_gnn_minimal.py \
 ### 評価
 
 ```bash
-# モデル評価
+# モデル評価（ACT搭載モデルも自動で構成を読み込みます）
 python scripts/evaluate_minimal.py \
-    --model models/qcgn2oei_best.pth \
+    --model models/qcgn2oei_stable_act_refine.pth \
     --nist-msp data/NIST17.MSP \
     --visualize --benchmark \
     --output-dir results/evaluation
