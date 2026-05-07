@@ -205,6 +205,12 @@ def predict_spectrum(
             )
             act_stats = None
     spectrum_np = spectrum.squeeze(0).detach().cpu().numpy()
+
+    # Normalize to relative intensity (base peak = 100)
+    max_intensity = spectrum_np.max()
+    if max_intensity > 0:
+        spectrum_np = (spectrum_np / max_intensity) * 100.0
+
     act_stats_out = None
     if act_stats is not None:
         act_stats_out = {}
@@ -226,11 +232,6 @@ def visualize_spectrum(
     Visualize predicted spectrum (same format as legacy script).
     """
     mz_values = np.arange(mz_range[0], mz_range[0] + len(spectrum))
-
-    # Normalize to Relative Intensity (0-100%)
-    max_intensity = spectrum.max()
-    if max_intensity > 0:
-        spectrum = (spectrum / max_intensity) * 100.0
 
     # Create plot
     fig, ax = plt.subplots(figsize=figsize)
@@ -504,10 +505,10 @@ def main():
     print("rank\tm/z\tintensity")
     print("-" * 40)
     for rank, (mz, intensity) in enumerate(peaks, start=1):
-        print(f"{rank}\t{mz}\t{intensity:.8f}")
+        print(f"{rank}\t{mz}\t{intensity:.4f}")
     print("-" * 40)
-    print(f"Spectrum sum: {float(spectrum.sum()):.8f}")
-    print(f"Spectrum max: {float(spectrum.max()):.8f}")
+    print(f"Spectrum sum: {float(spectrum.sum()):.4f}")
+    print(f"Spectrum max: {float(spectrum.max()):.4f}")
     print(f"Spectrum argmax m/z: {int(np.argmax(spectrum) + 1)}")
     if args.output_spectrum is not None:
         save_spectrum_csv(args.output_spectrum, spectrum)
