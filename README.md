@@ -8,14 +8,14 @@
 
 ### コア機能
 
-- **GNN Architecture**: GATv2Conv (デフォルト: 16層, 1280 hidden dimension, 32 heads - RTX 5090最適化)
+- **GNN Architecture**: GATv2Conv (デフォルト: 14層, 768 hidden dimension, 24 heads - RTX 5070 Ti最適化)
 - **OpenMythos ACT Recurrent Refinement**: グラフプーリング後の表現を、適応的計算時間（ACT: Adaptive Computation Time）、LTI風安定化、ループ埋め込みを用いて再帰的に細分化・改良する機能。
 - **Node Features**: 34次元（原子種、ハイブリダイゼーション、芳香族性、電荷、ラジカル、**立体化学/Chirality**）
 - **Edge Features**: 10次元（結合次数、**BDE**、共役系、**結合立体化学/Stereo**）
 - **Loss Function**: Cosine similarity loss + ACT Ponder Loss (推論時間調整用) + 中間スペクトル補助損失 (Auxiliary Loss)
 - **Optimizer**: RAdam
 - **評価メトリクス**: Cosine Similarity, Top-K Recall, MSE/RMSE, Spectral Angle
-- **RTX 50シリーズ対応**: RTX 5090 (32GB) 最適化アーキテクチャ
+- **RTX 50シリーズ対応**: RTX 5070 Ti (16GB) 最適化アーキテクチャ。RTX 5090ではモデルを巨大化するより、batch sizeを増やして学習速度と勾配安定性を高めることを推奨。
 
 ## 🎯 性能目標
 
@@ -92,10 +92,10 @@ python scripts/train_gnn_minimal.py \
     --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
     --output models/qcgn2oei_stable_act_refine.pth \
     --epochs 200 \
-    --batch-size 16 \
-    --hidden-dim 1280 \
-    --num-layers 16 \
-    --num-heads 32 \
+    --batch-size 32 \
+    --hidden-dim 768 \
+    --num-layers 14 \
+    --num-heads 24 \
     --use-recurrent-refinement \
     --refinement-steps 4 \
     --refinement-max-steps 8 \

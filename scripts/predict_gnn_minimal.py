@@ -68,9 +68,9 @@ def get_model_config_from_checkpoint(
     config = {
         "node_dim": int(pick("node_dim", 34)),
         "edge_dim": int(pick("edge_dim", 10)),
-        "hidden_dim": int(pick("hidden_dim", 1280)),
-        "num_layers": int(pick("num_layers", 16)),
-        "num_heads": int(pick("num_heads", 32)),
+        "hidden_dim": int(pick("hidden_dim", 768)),
+        "num_layers": int(pick("num_layers", 14)),
+        "num_heads": int(pick("num_heads", 24)),
         "output_dim": int(pick("output_dim", 1000)),
         "dropout": float(pick("dropout", 0.0)),
         "use_edge_attr": bool(pick("use_edge_attr", True)),
