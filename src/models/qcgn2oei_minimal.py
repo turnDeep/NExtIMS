@@ -12,7 +12,8 @@ This version adds:
 - Optional intermediate spectra for auxiliary loss
 Base architecture:
 - GATv2Conv encoder
-- Global mean pooling
+- Graph pooling with mean/add/max aggregation
+- Optional graph-level molecular features
 - Spectrum prediction head
 """
 import logging
@@ -20,7 +21,7 @@ from typing import Optional, Tuple, Dict, Any, List, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATv2Conv, global_mean_pool
+from torch_geometric.nn import GATv2Conv, global_add_pool, global_max_pool, global_mean_pool
 logger = logging.getLogger(__name__)
 class StableACTRecurrentSpectralRefinementBlock(nn.Module):
     """
@@ -277,12 +278,19 @@ class QCGN2oEI_Minimal(nn.Module):
         use_act: bool = False,
         act_epsilon: float = 0.01,
         act_loss_weight: float = 0.01,
+        pooling_mode: str = "mean_add_max",
+        graph_feature_dim: int = 17,
+        use_graph_features: bool = True,
     ):
         super().__init__()
         if hidden_dim % num_heads != 0:
             raise ValueError(
                 f"hidden_dim must be divisible by num_heads. "
                 f"Got hidden_dim={hidden_dim}, num_heads={num_heads}"
+            )
+        if pooling_mode not in {"mean", "mean_add_max"}:
+            raise ValueError(
+                f"pooling_mode must be 'mean' or 'mean_add_max'. Got {pooling_mode}"
             )
         self.node_dim = node_dim
         self.edge_dim = edge_dim
@@ -301,6 +309,9 @@ class QCGN2oEI_Minimal(nn.Module):
         self.use_act = use_act
         self.act_epsilon = act_epsilon
         self.act_loss_weight = act_loss_weight
+        self.pooling_mode = pooling_mode
+        self.graph_feature_dim = graph_feature_dim
+        self.use_graph_features = use_graph_features and graph_feature_dim > 0
         self.node_encoder = nn.Sequential(
             nn.Linear(node_dim, hidden_dim),
             nn.ELU(),
@@ -331,6 +342,27 @@ class QCGN2oEI_Minimal(nn.Module):
             )
             self.residual_layers.append(nn.Linear(hidden_dim, hidden_dim))
             self.layer_norms.append(nn.LayerNorm(hidden_dim))
+        if self.use_graph_features:
+            self.graph_feature_encoder = nn.Sequential(
+                nn.LayerNorm(graph_feature_dim),
+                nn.Linear(graph_feature_dim, hidden_dim),
+                nn.ELU(),
+                nn.Dropout(dropout),
+            )
+        else:
+            self.graph_feature_encoder = None
+        pooled_dim = hidden_dim if pooling_mode == "mean" else hidden_dim * 3
+        if self.use_graph_features:
+            pooled_dim += hidden_dim
+        if pooled_dim == hidden_dim:
+            self.pool_projection = nn.Identity()
+        else:
+            self.pool_projection = nn.Sequential(
+                nn.Linear(pooled_dim, hidden_dim),
+                nn.ELU(),
+                nn.LayerNorm(hidden_dim),
+                nn.Dropout(dropout),
+            )
         if use_recurrent_refinement:
             self.refinement_block = StableACTRecurrentSpectralRefinementBlock(
                 hidden_dim=hidden_dim,
@@ -368,16 +400,63 @@ class QCGN2oEI_Minimal(nn.Module):
         logger.info(f"  Use LTI stabilization: {use_lti_stabilization}")
         logger.info(f"  Use loop embedding: {use_loop_embedding}")
         logger.info(f"  Use ACT: {use_act}")
+        logger.info(f"  Pooling mode: {pooling_mode}")
+        logger.info(f"  Use graph features: {self.use_graph_features}")
+        logger.info(f"  Graph feature dim: {graph_feature_dim}")
         total_params = sum(p.numel() for p in self.parameters())
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         logger.info(f"  Total parameters: {total_params:,}")
         logger.info(f"  Trainable parameters: {trainable_params:,}")
+    def _pool_graph(
+        self,
+        x: torch.Tensor,
+        batch: Optional[torch.Tensor],
+        graph_features: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        if batch is None:
+            graph_mean = x.mean(dim=0, keepdim=True)
+            if self.pooling_mode == "mean":
+                pooled_parts = [graph_mean]
+            else:
+                pooled_parts = [
+                    graph_mean,
+                    x.sum(dim=0, keepdim=True),
+                    x.max(dim=0, keepdim=True).values,
+                ]
+        else:
+            graph_mean = global_mean_pool(x, batch)
+            if self.pooling_mode == "mean":
+                pooled_parts = [graph_mean]
+            else:
+                pooled_parts = [
+                    graph_mean,
+                    global_add_pool(x, batch),
+                    global_max_pool(x, batch),
+                ]
+        batch_size = pooled_parts[0].size(0)
+        if self.use_graph_features:
+            if graph_features is None:
+                graph_features = torch.zeros(
+                    batch_size,
+                    self.graph_feature_dim,
+                    dtype=x.dtype,
+                    device=x.device,
+                )
+            else:
+                graph_features = graph_features.to(device=x.device, dtype=x.dtype)
+                if graph_features.dim() == 1:
+                    graph_features = graph_features.unsqueeze(0)
+                if graph_features.size(0) != batch_size:
+                    graph_features = graph_features.view(batch_size, -1)
+            pooled_parts.append(self.graph_feature_encoder(graph_features))
+        return self.pool_projection(torch.cat(pooled_parts, dim=-1))
     def forward(
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
         edge_attr: Optional[torch.Tensor] = None,
         batch: Optional[torch.Tensor] = None,
+        graph_features: Optional[torch.Tensor] = None,
         refinement_steps: Optional[int] = None,
         return_intermediate: bool = False,
         return_act_stats: bool = False,
@@ -394,6 +473,8 @@ class QCGN2oEI_Minimal(nn.Module):
                 Edge attributes [num_edges, edge_dim]
             batch:
                 Batch assignment [num_nodes]
+            graph_features:
+                Graph-level molecular features [batch_size, graph_feature_dim].
             refinement_steps:
                 Optional override of recurrent refinement loop count.
             return_intermediate:
@@ -427,10 +508,7 @@ class QCGN2oEI_Minimal(nn.Module):
             x = F.elu(x + self.residual_layers[i](residual))
             x = self.layer_norms[i](x)
             x = F.dropout(x, p=self.dropout, training=self.training)
-        if batch is None:
-            graph_repr = x.mean(dim=0, keepdim=True)
-        else:
-            graph_repr = global_mean_pool(x, batch)
+        graph_repr = self._pool_graph(x, batch, graph_features)
         act_stats = None
         intermediate_spectra: List[torch.Tensor] = []
         if self.use_recurrent_refinement and self.refinement_block is not None:
@@ -517,6 +595,9 @@ class QCGN2oEI_Minimal(nn.Module):
             "use_act": self.use_act,
             "act_epsilon": self.act_epsilon,
             "act_loss_weight": self.act_loss_weight,
+            "pooling_mode": self.pooling_mode,
+            "graph_feature_dim": self.graph_feature_dim,
+            "use_graph_features": self.use_graph_features,
             "total_params": total_params,
             "trainable_params": trainable_params,
             "memory_estimate_mb": total_params * 4 / (1024 * 1024),
@@ -552,12 +633,14 @@ if __name__ == "__main__":
         dtype=torch.long,
     )
     edge_attr = torch.randn(num_edges, info["edge_dim"])
+    graph_features = torch.randn(1, info["graph_feature_dim"])
     print("\nSingle graph:")
     with torch.no_grad():
         spectrum, act_stats = model(
             x=x,
             edge_index=edge_index,
             edge_attr=edge_attr,
+            graph_features=graph_features,
             return_act_stats=True,
         )
     print(f"  Output spectrum shape: {spectrum.shape}")
@@ -566,12 +649,14 @@ if __name__ == "__main__":
     print(f"  Mean ponder steps: {act_stats['mean_ponder_steps'].item():.4f}")
     print("\nBatch of 3 graphs:")
     batch = torch.tensor([0, 0, 1, 1, 2, 2], dtype=torch.long)
+    graph_features_batch = torch.randn(3, info["graph_feature_dim"])
     with torch.no_grad():
         spectrum_batch, act_stats_batch = model(
             x=x,
             edge_index=edge_index,
             edge_attr=edge_attr,
             batch=batch,
+            graph_features=graph_features_batch,
             return_act_stats=True,
         )
     print(f"  Output spectrum shape: {spectrum_batch.shape}")

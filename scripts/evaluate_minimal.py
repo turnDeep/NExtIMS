@@ -131,6 +131,9 @@ class ModelEvaluator:
             "use_act": bool(pick("use_act", False)),
             "act_epsilon": float(pick("act_epsilon", 0.01)),
             "act_loss_weight": float(pick("act_loss_weight", 0.0)),
+            "pooling_mode": str(pick("pooling_mode", "mean")),
+            "graph_feature_dim": int(pick("graph_feature_dim", 0)),
+            "use_graph_features": bool(pick("use_graph_features", False)),
         }
 
         self.model = QCGN2oEI_Minimal(**self.config)
@@ -288,6 +291,7 @@ class ModelEvaluator:
                     edge_index=batch_graph.edge_index,
                     edge_attr=batch_graph.edge_attr,
                     batch=batch_graph.batch,
+                    graph_features=getattr(batch_graph, "graph_features", None),
                     refinement_steps=self.config.get("refinement_steps"),
                     return_act_stats=False,
                     force_no_act=True # force no act during typical batch evaluation for consistent behavior unless explicitly handled
@@ -419,6 +423,7 @@ class ModelEvaluator:
                         edge_index=batch.edge_index,
                         edge_attr=batch.edge_attr,
                         batch=batch.batch,
+                        graph_features=getattr(batch, "graph_features", None),
                         refinement_steps=self.config.get("refinement_steps"),
                         force_no_act=True
                     )

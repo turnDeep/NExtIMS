@@ -27,12 +27,34 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import torch
 from rdkit import Chem
+from rdkit.Chem import Descriptors, rdMolDescriptors
 from torch_geometric.data import Data
 
 from src.data.features_qcgn import QCGNFeaturizer
 from src.data.bde_calculator import BDECalculator, BDECache
 
 logger = logging.getLogger(__name__)
+
+GRAPH_FEATURE_ELEMENTS = [
+    "C",
+    "O",
+    "H",
+    "N",
+    "S",
+    "Si",
+    "P",
+    "Cl",
+    "F",
+    "I",
+    "Se",
+    "As",
+    "B",
+    "Br",
+    "Sn",
+]
+GRAPH_FEATURE_DIM = 2 + len(GRAPH_FEATURE_ELEMENTS)
+MASS_SCALE = 1000.0
+COUNT_SCALE = 100.0
 
 
 class MinimalGraphGenerator:
@@ -128,6 +150,39 @@ class MinimalGraphGenerator:
             'calculator_calls': 0,
             'default_bde_used': 0
         }
+
+    def get_graph_features(self, mol: Chem.Mol) -> Tuple[np.ndarray, float, int]:
+        """
+        Build graph-level mass and formula-count features.
+
+        Returns:
+            features:
+                [exact_mass, molecular_weight, element_counts...] normalized
+                to compact numeric ranges.
+            exact_mass:
+                Unnormalized exact molecular mass.
+            molecular_ion_mz:
+                Nominal molecular-ion m/z bin for singly-charged EI-MS.
+        """
+        exact_mass = float(rdMolDescriptors.CalcExactMolWt(mol))
+        molecular_weight = float(Descriptors.MolWt(mol))
+        counts = {element: 0.0 for element in GRAPH_FEATURE_ELEMENTS}
+        for atom in mol.GetAtoms():
+            symbol = atom.GetSymbol()
+            if symbol in counts:
+                counts[symbol] += 1.0
+            hydrogen_count = float(atom.GetTotalNumHs())
+            if symbol != "H" and "H" in counts:
+                counts["H"] += hydrogen_count
+        feature_values = [
+            exact_mass / MASS_SCALE,
+            molecular_weight / MASS_SCALE,
+        ]
+        feature_values.extend(
+            counts[element] / COUNT_SCALE for element in GRAPH_FEATURE_ELEMENTS
+        )
+        molecular_ion_mz = max(1, int(round(exact_mass)))
+        return np.array(feature_values, dtype=np.float32), exact_mass, molecular_ion_mz
 
     def get_bde_for_molecule(self, mol: Chem.Mol, smiles: str) -> Dict[int, float]:
         """
@@ -240,8 +295,14 @@ class MinimalGraphGenerator:
             edge_index = torch.empty((2, 0), dtype=torch.long)
             edge_attr = torch.empty((0, self.featurizer.get_edge_dim()), dtype=torch.float32)
 
+        graph_features, exact_mass, molecular_ion_mz = self.get_graph_features(mol)
+
         # Create PyG Data object
         data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+        data.graph_features = torch.tensor(graph_features, dtype=torch.float32).unsqueeze(0)
+        data.molecular_mass = torch.tensor([exact_mass], dtype=torch.float32)
+        data.molecular_ion_mz = torch.tensor([molecular_ion_mz], dtype=torch.long)
+        data.molecular_ion_index = torch.tensor([molecular_ion_mz - 1], dtype=torch.long)
 
         # Add target spectrum
         if spectrum is not None:
@@ -359,6 +420,8 @@ if __name__ == "__main__":
             print(f"    Edges: {graph.num_edges}")
             print(f"    Node features: {graph.x.shape}")
             print(f"    Edge features: {graph.edge_attr.shape}")
+            print(f"    Graph features: {graph.graph_features.shape}")
+            print(f"    Molecular ion m/z: {graph.molecular_ion_mz.item()}")
             print(f"    Spectrum: {graph.y.shape}")
             print(f"    Metadata: smiles={graph.smiles}, name={graph.compound_name}")
 
