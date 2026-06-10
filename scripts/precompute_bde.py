@@ -65,7 +65,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def parse_nist_msp(msp_path: str, max_compounds: int = 0) -> List[str]:
+def parse_nist_msp(
+    msp_path: str,
+    max_compounds: int = 0,
+    mol_files_dir: Optional[str] = None,
+) -> List[str]:
     """
     Extract SMILES from NIST MSP file
 
@@ -79,20 +83,38 @@ def parse_nist_msp(msp_path: str, max_compounds: int = 0) -> List[str]:
     logger.info(f"Parsing NIST MSP file: {msp_path}")
 
     smiles_list = []
-    current_smiles = None
+    mol_dir = Path(mol_files_dir) if mol_files_dir else None
 
+    def flush_entry(entry: Dict[str, str]) -> bool:
+        smiles = entry.get("smiles")
+        if not smiles and mol_dir is not None and entry.get("id"):
+            mol_file = mol_dir / f"ID{entry['id']}.MOL"
+            if mol_file.exists():
+                try:
+                    mol = Chem.MolFromMolFile(str(mol_file), sanitize=True, removeHs=False)
+                    if mol is not None:
+                        smiles = Chem.MolToSmiles(mol)
+                except Exception as e:
+                    logger.debug(f"Failed to load MOL file {mol_file}: {e}")
+        if smiles:
+            smiles_list.append(smiles)
+        return max_compounds > 0 and len(smiles_list) >= max_compounds
+
+    current_entry: Dict[str, str] = {}
     with open(msp_path, 'r', encoding='utf-8', errors='ignore') as f:
         for line in f:
             line = line.strip()
-
-            if line.startswith('SMILES:'):
-                current_smiles = line.split(':', 1)[1].strip()
-                if current_smiles:
-                    smiles_list.append(current_smiles)
-
-                # Limit if requested
-                if max_compounds > 0 and len(smiles_list) >= max_compounds:
+            if line.startswith('Name:'):
+                if current_entry and flush_entry(current_entry):
                     break
+                current_entry = {}
+            elif line.startswith('SMILES:'):
+                current_entry['smiles'] = line.split(':', 1)[1].strip()
+            elif line.startswith('ID:'):
+                current_entry['id'] = line.split(':', 1)[1].strip()
+        else:
+            if current_entry:
+                flush_entry(current_entry)
 
     logger.info(f"Extracted {len(smiles_list):,} SMILES strings")
     return smiles_list
@@ -304,6 +326,12 @@ def main():
         help='Path to NIST17.MSP file'
     )
     parser.add_argument(
+        '--mol-files-dir',
+        type=str,
+        default=None,
+        help='Directory containing MOL files linked by ID when MSP has no SMILES'
+    )
+    parser.add_argument(
         '--output',
         type=str,
         default='data/processed/bde_cache/nist17_bde_cache.h5',
@@ -373,6 +401,7 @@ def main():
     logger.info("NExtIMS v1.0: BDE Pre-computation for NIST17")
     logger.info("="*80)
     logger.info(f"Input:  {args.nist_msp}")
+    logger.info(f"MOL files dir: {args.mol_files_dir}")
     logger.info(f"Output: {args.output}")
     logger.info("")
 
@@ -402,7 +431,11 @@ def main():
     logger.info("")
 
     # Load SMILES from NIST MSP
-    smiles_list = parse_nist_msp(args.nist_msp, args.max_compounds)
+    smiles_list = parse_nist_msp(
+        args.nist_msp,
+        args.max_compounds,
+        mol_files_dir=args.mol_files_dir,
+    )
 
     if not smiles_list:
         logger.error("No SMILES found in MSP file")

@@ -156,12 +156,19 @@ def predict_spectrum(
     checkpoint = torch.load(model_path, map_location=device)
 
     # Load model args from checkpoint if available
+    model_info = checkpoint.get('model_info', {})
     ckpt_args = checkpoint.get('args', {})
-    node_dim = ckpt_args.get('node_dim', 34)
-    edge_dim = ckpt_args.get('edge_dim', 10)
-    hidden_dim = ckpt_args.get('hidden_dim', 768)
-    num_layers = ckpt_args.get('num_layers', 14)
-    num_heads = ckpt_args.get('num_heads', 24)
+    def pick(name, default):
+        if name in model_info:
+            return model_info[name]
+        if name in ckpt_args:
+            return ckpt_args[name]
+        return default
+    node_dim = pick('node_dim', 34)
+    edge_dim = pick('edge_dim', 10)
+    hidden_dim = pick('hidden_dim', 768)
+    num_layers = pick('num_layers', 14)
+    num_heads = pick('num_heads', 24)
 
     model = QCGN2oEI_Minimal(
         node_dim=node_dim,
@@ -170,7 +177,20 @@ def predict_spectrum(
         num_layers=num_layers,
         num_heads=num_heads,
         output_dim=max_mz - min_mz + 1,
-        dropout=0.1
+        dropout=float(pick('dropout', 0.1)),
+        use_edge_attr=bool(pick('use_edge_attr', True)),
+        use_recurrent_refinement=bool(pick('use_recurrent_refinement', False)),
+        refinement_steps=int(pick('refinement_steps', 4)),
+        refinement_max_steps=int(pick('refinement_max_steps', 8)),
+        refinement_dropout=float(pick('refinement_dropout', 0.1)),
+        use_lti_stabilization=bool(pick('use_lti_stabilization', True)),
+        use_loop_embedding=bool(pick('use_loop_embedding', True)),
+        use_act=bool(pick('use_act', False)),
+        act_epsilon=float(pick('act_epsilon', 0.01)),
+        act_loss_weight=float(pick('act_loss_weight', 0.0)),
+        pooling_mode=str(pick('pooling_mode', 'mean')),
+        graph_feature_dim=int(pick('graph_feature_dim', 0)),
+        use_graph_features=bool(pick('use_graph_features', False)),
     )
 
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -191,7 +211,8 @@ def predict_spectrum(
             x=graph.x,
             edge_index=graph.edge_index,
             edge_attr=graph.edge_attr,
-            batch=graph.batch
+            batch=getattr(graph, "batch", None),
+            graph_features=getattr(graph, "graph_features", None),
         )
     inference_time = time.time() - start_time
 

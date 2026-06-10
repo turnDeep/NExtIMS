@@ -14,8 +14,10 @@ import os
 import sys
 import argparse
 import logging
+import random
 from pathlib import Path
 from typing import Dict, Optional
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -26,7 +28,7 @@ from rdkit import Chem
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
 from src.training.losses import cosine_similarity_loss
-from src.data.graph_generator_minimal import MinimalGraphGenerator
+from src.data.graph_generator_minimal import GRAPH_FEATURE_DIM, MinimalGraphGenerator
 from src.data.nist_dataset import parse_msp_file, peaks_to_spectrum
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +45,10 @@ class NISTGraphDataset(Dataset):
         msp_path: str,
         bde_cache_path: Optional[str] = None,
         bondnet_model: Optional[str] = None,
+        mol_files_dir: str = "data/mol_files",
+        use_bde: bool = True,
+        use_mass_features: bool = True,
+        use_formula_features: bool = True,
         max_samples: int = 0,
         min_mz: int = 1,
         max_mz: int = 1000,
@@ -53,11 +59,17 @@ class NISTGraphDataset(Dataset):
             bde_cache_path=bde_cache_path,
             use_bde_calculator=(bondnet_model is not None),
             bondnet_model=bondnet_model,
+            use_bde=use_bde,
+            use_mass_features=use_mass_features,
+            use_formula_features=use_formula_features,
             default_bde=85.0,
         )
         logger.info(f"Loading NIST data from {msp_path}")
-        mol_files_dir = "data/mol_files"
-        entries = parse_msp_file(msp_path, mol_files_dir=mol_files_dir)
+        entries = parse_msp_file(
+            msp_path,
+            mol_files_dir=mol_files_dir,
+            max_entries=max_samples,
+        )
         if max_samples > 0:
             entries = entries[:max_samples]
         logger.info(f"Loaded {len(entries):,} entries")
@@ -107,6 +119,25 @@ def collate_pyg_graphs(batch_list):
     if len(batch_list) == 0:
         return None
     return Batch.from_data_list(batch_list)
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def topk_recall_batch(
+    pred_spectrum: torch.Tensor,
+    target_spectrum: torch.Tensor,
+    k: int,
+) -> torch.Tensor:
+    pred_topk = torch.topk(pred_spectrum, k=k, dim=-1).indices
+    target_topk = torch.topk(target_spectrum, k=k, dim=-1).indices
+    hits = (pred_topk.unsqueeze(-1) == target_topk.unsqueeze(1)).any(dim=1)
+    return hits.float().mean(dim=-1)
 def _forward_and_loss(
     model: nn.Module,
     batch,
@@ -133,6 +164,7 @@ def _forward_and_loss(
     use_intermediate = bool(
         args.use_recurrent_refinement and args.use_intermediate_loss and training
     )
+    graph_features = getattr(batch, "graph_features", None)
     if use_intermediate:
         # Intermediate supervision uses fixed-loop mode.
         if use_act_stats:
@@ -141,6 +173,7 @@ def _forward_and_loss(
                 edge_index=batch.edge_index,
                 edge_attr=batch.edge_attr,
                 batch=batch.batch,
+                graph_features=graph_features,
                 refinement_steps=args.refinement_steps,
                 return_intermediate=True,
                 return_act_stats=True,
@@ -152,6 +185,7 @@ def _forward_and_loss(
                 edge_index=batch.edge_index,
                 edge_attr=batch.edge_attr,
                 batch=batch.batch,
+                graph_features=graph_features,
                 refinement_steps=args.refinement_steps,
                 return_intermediate=True,
                 return_act_stats=False,
@@ -183,6 +217,7 @@ def _forward_and_loss(
             edge_index=batch.edge_index,
             edge_attr=batch.edge_attr,
             batch=batch.batch,
+            graph_features=graph_features,
             refinement_steps=args.refinement_steps,
             return_act_stats=True,
             force_no_act=args.force_no_act_eval and not training,
@@ -190,13 +225,17 @@ def _forward_and_loss(
         main_loss = cosine_similarity_loss(pred_spectrum, batch.y)
         act_loss = act_stats["act_loss"]
         aux_loss = torch.zeros((), device=batch.y.device)
-        loss = main_loss + args.act_loss_weight * act_loss
+        loss = (
+            main_loss
+            + args.act_loss_weight * act_loss
+        )
         return loss, main_loss, act_loss, aux_loss, pred_spectrum, act_stats
     pred_spectrum = model(
         x=batch.x,
         edge_index=batch.edge_index,
         edge_attr=batch.edge_attr,
         batch=batch.batch,
+        graph_features=graph_features,
         refinement_steps=args.refinement_steps if args.use_recurrent_refinement else None,
         force_no_act=args.force_no_act_eval and not training,
     )
@@ -223,6 +262,10 @@ def train_epoch(
     total_aux_loss = 0.0
     total_cosine_sim = 0.0
     total_ponder_steps = 0.0
+    total_top5 = 0.0
+    total_top10 = 0.0
+    total_top20 = 0.0
+    total_samples = 0
     num_batches = 0
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch in pbar:
@@ -289,6 +332,10 @@ def evaluate(
     total_aux_loss = 0.0
     total_cosine_sim = 0.0
     total_ponder_steps = 0.0
+    total_top5 = 0.0
+    total_top10 = 0.0
+    total_top20 = 0.0
+    total_samples = 0
     num_batches = 0
     pbar = tqdm(dataloader, desc="Evaluating")
     for batch in pbar:
@@ -309,6 +356,11 @@ def evaluate(
         total_cosine_sim += cosine_sim
         if act_stats is not None:
             total_ponder_steps += act_stats["mean_ponder_steps"].item()
+        batch_size = batch.y.size(0)
+        total_top5 += topk_recall_batch(pred_spectrum, batch.y, 5).sum().item()
+        total_top10 += topk_recall_batch(pred_spectrum, batch.y, 10).sum().item()
+        total_top20 += topk_recall_batch(pred_spectrum, batch.y, 20).sum().item()
+        total_samples += batch_size
         num_batches += 1
         avg_loss = total_loss / num_batches
         avg_cos_sim = total_cosine_sim / num_batches
@@ -328,6 +380,9 @@ def evaluate(
         "act_loss": total_act_loss / num_batches,
         "aux_loss": total_aux_loss / num_batches,
         "cosine_sim": total_cosine_sim / num_batches,
+        "top5": total_top5 / total_samples,
+        "top10": total_top10 / total_samples,
+        "top20": total_top20 / total_samples,
         "mean_ponder_steps": total_ponder_steps / num_batches if total_ponder_steps > 0 else 0.0,
     }
     return metrics
@@ -336,6 +391,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Train QCGN2oEI_Minimal on NIST17"
     )
     parser.add_argument("--nist-msp", type=str, required=True, help="Path to NIST MSP file")
+    parser.add_argument("--mol-files-dir", type=str, default="data/mol_files", help="Directory containing NIST MOL files")
     parser.add_argument("--bde-cache", type=str, default=None, help="Path to BDE HDF5 cache")
     parser.add_argument("--bondnet-model", type=str, default=None, help="Path to BonDNet model for on-the-fly BDE calculation")
     parser.add_argument("--output", type=str, default="models/qcgn2oei_minimal.pth", help="Output model path")
@@ -348,10 +404,38 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
     parser.add_argument("--max-samples", type=int, default=0, help="Max samples to use. 0 means all.")
     parser.add_argument("--val-split", type=float, default=0.1, help="Validation split")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for split and training")
     parser.add_argument("--device", type=str, default="cuda", help="Device: cuda or cpu")
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--save-interval", type=int, default=10, help="Save checkpoint every N epochs")
     parser.add_argument("--grad-clip", type=float, default=1.0, help="Gradient clipping max norm")
+    parser.add_argument(
+        "--pooling-mode",
+        type=str,
+        default="mean_add_max",
+        choices=["mean", "mean_add_max"],
+        help="Graph pooling mode",
+    )
+    parser.add_argument(
+        "--no-graph-features",
+        action="store_true",
+        help="Disable graph-level molecular mass/formula features",
+    )
+    parser.add_argument(
+        "--no-bde",
+        action="store_true",
+        help="Disable BDE edge feature values",
+    )
+    parser.add_argument(
+        "--no-mass-features",
+        action="store_true",
+        help="Zero exact/molecular mass graph features while keeping formula counts",
+    )
+    parser.add_argument(
+        "--no-formula-features",
+        action="store_true",
+        help="Zero formula-count graph features while keeping molecular mass",
+    )
     # Recurrent refinement options
     parser.add_argument(
         "--use-recurrent-refinement",
@@ -423,6 +507,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main():
     parser = build_arg_parser()
     args = parser.parse_args()
+    set_seed(args.seed)
     if args.device == "cuda" and not torch.cuda.is_available():
         logger.warning("CUDA was requested but is not available. Falling back to CPU.")
         args.device = "cpu"
@@ -440,6 +525,7 @@ def main():
     logger.info("NExtIMS v1.0: Minimal GNN Training")
     logger.info("=" * 80)
     logger.info(f"NIST MSP: {args.nist_msp}")
+    logger.info(f"MOL files dir: {args.mol_files_dir}")
     logger.info(f"BDE cache: {args.bde_cache}")
     logger.info(f"Output: {args.output}")
     logger.info(f"Epochs: {args.epochs}")
@@ -454,11 +540,20 @@ def main():
     logger.info(f"Use ACT: {args.use_act}")
     logger.info(f"ACT loss weight: {args.act_loss_weight}")
     logger.info(f"Use intermediate loss: {args.use_intermediate_loss}")
+    logger.info(f"Pooling mode: {args.pooling_mode}")
+    logger.info(f"Use graph features: {not args.no_graph_features}")
+    logger.info(f"Use BDE: {not args.no_bde}")
+    logger.info(f"Use mass features: {not args.no_mass_features}")
+    logger.info(f"Use formula features: {not args.no_formula_features}")
     logger.info("")
     dataset = NISTGraphDataset(
         msp_path=args.nist_msp,
         bde_cache_path=args.bde_cache,
         bondnet_model=args.bondnet_model,
+        mol_files_dir=args.mol_files_dir,
+        use_bde=not args.no_bde,
+        use_mass_features=not args.no_mass_features,
+        use_formula_features=not args.no_formula_features,
         max_samples=args.max_samples,
     )
     val_size = int(len(dataset) * args.val_split)
@@ -470,6 +565,7 @@ def main():
     train_dataset, val_dataset = torch.utils.data.random_split(
         dataset,
         [train_size, val_size],
+        generator=torch.Generator().manual_seed(args.seed),
     )
     logger.info(f"Train size: {train_size:,}")
     logger.info(f"Val size: {val_size:,}")
@@ -477,6 +573,7 @@ def main():
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
+        generator=torch.Generator().manual_seed(args.seed),
         num_workers=args.num_workers,
         collate_fn=collate_pyg_graphs,
     )
@@ -506,6 +603,9 @@ def main():
         use_act=args.use_act,
         act_epsilon=args.act_epsilon,
         act_loss_weight=args.act_loss_weight,
+        pooling_mode=args.pooling_mode,
+        graph_feature_dim=GRAPH_FEATURE_DIM,
+        use_graph_features=not args.no_graph_features,
     ).to(args.device)
     model_info = model.get_model_info()
     logger.info("Model info:")
@@ -553,6 +653,9 @@ def main():
             f"ACT Loss: {val_metrics['act_loss']:.4f}, "
             f"Aux Loss: {val_metrics['aux_loss']:.4f}, "
             f"Cosine Sim: {val_metrics['cosine_sim']:.4f}, "
+            f"Top5: {val_metrics['top5']:.4f}, "
+            f"Top10: {val_metrics['top10']:.4f}, "
+            f"Top20: {val_metrics['top20']:.4f}, "
             f"Ponder: {val_metrics['mean_ponder_steps']:.2f}"
         )
         if val_metrics["cosine_sim"] > best_val_cosine:
@@ -563,6 +666,7 @@ def main():
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_cosine_sim": best_val_cosine,
+                    "val_metrics": val_metrics,
                     "args": vars(args),
                     "model_info": model.get_model_info(),
                 },
@@ -577,6 +681,7 @@ def main():
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_cosine_sim": val_metrics["cosine_sim"],
+                    "val_metrics": val_metrics,
                     "args": vars(args),
                     "model_info": model.get_model_info(),
                 },

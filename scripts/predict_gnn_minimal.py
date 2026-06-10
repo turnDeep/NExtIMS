@@ -101,6 +101,15 @@ def get_model_config_from_checkpoint(
         "act_loss_weight": float(
             pick("act_loss_weight", 0.0)
         ),
+        "pooling_mode": str(
+            pick("pooling_mode", "mean")
+        ),
+        "graph_feature_dim": int(
+            pick("graph_feature_dim", 0)
+        ),
+        "use_graph_features": bool(
+            pick("use_graph_features", False)
+        ),
     }
     # CLI overrides
     if args.refinement_steps is not None:
@@ -189,6 +198,7 @@ def predict_spectrum(
                 edge_index=graph.edge_index,
                 edge_attr=graph.edge_attr,
                 batch=None,
+                graph_features=getattr(graph, "graph_features", None),
                 refinement_steps=refinement_steps,
                 return_act_stats=True,
                 force_no_act=force_no_act,
@@ -199,6 +209,7 @@ def predict_spectrum(
                 edge_index=graph.edge_index,
                 edge_attr=graph.edge_attr,
                 batch=None,
+                graph_features=getattr(graph, "graph_features", None),
                 refinement_steps=refinement_steps,
                 return_act_stats=False,
                 force_no_act=force_no_act,
