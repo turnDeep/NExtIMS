@@ -30,6 +30,7 @@ import numpy as np
 from rdkit import Chem
 
 logger = logging.getLogger(__name__)
+EV_TO_KCAL_MOL = 23.0605
 
 # Try to import BonDNet
 try:
@@ -111,11 +112,38 @@ class BDECalculator:
 
         # Get model info (includes unit conversion factor)
         model_info = get_model_info(self.model_path)
-        self.unit_converter = model_info.get("unit_conversion", 23.06)  # eV to kcal/mol
+        unit_converter = float(model_info.get("unit_conversion", EV_TO_KCAL_MOL))
+        # BonDNet's official BDNCM model reports unit_conversion: 1.0 and returns
+        # BDE-like values in eV. NExtIMS edge features are normalized as kcal/mol.
+        self.unit_converter = EV_TO_KCAL_MOL if unit_converter <= 1.0 else unit_converter
 
-        logger.info(f"Unit conversion: eV → kcal/mol (×{self.unit_converter})")
+        logger.info(f"Unit conversion to kcal/mol: ×{self.unit_converter}")
         logger.info(f"Charge states: {self.allowed_charges}")
         logger.info(f"Ring bonds: {self.ring_bond}")
+
+    @staticmethod
+    def _bond_key_to_index(mol: Chem.Mol, bond_key) -> Optional[int]:
+        """
+        Convert BonDNet bond identifiers to RDKit bond indices.
+
+        Recent BonDNet pretrained prediction paths return atom-index tuples
+        such as (0, 1), while older NExtIMS code expected integer bond ids.
+        The GNN graph only has explicit RDKit bonds, so implicit-H reactions are
+        ignored by returning None.
+        """
+        if isinstance(bond_key, (int, np.integer)):
+            return int(bond_key)
+        if isinstance(bond_key, (tuple, list)) and len(bond_key) >= 2:
+            begin = int(bond_key[0])
+            end = int(bond_key[1])
+            if begin < 0 or end < 0:
+                return None
+            if begin >= mol.GetNumAtoms() or end >= mol.GetNumAtoms():
+                return None
+            bond = mol.GetBondBetweenAtoms(begin, end)
+            if bond is not None:
+                return int(bond.GetIdx())
+        return None
 
     def calculate_bde(
         self,
@@ -166,6 +194,10 @@ class BDECalculator:
                 extra_features
             )
 
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return {}
+
             # Map predictions to bond indices
             # BonDNet returns one prediction per reaction (bond × charge state)
             # We need to group by bond and select minimum BDE
@@ -173,8 +205,10 @@ class BDECalculator:
 
             for rxn_idx, pred_value in enumerate(predictions):
                 if pred_value is not None and not np.isnan(pred_value):
-                    bond_idx = predictor.rxn_idx_to_bond_map[rxn_idx]
-                    predictions_by_bond[bond_idx].append(pred_value)
+                    bond_key = predictor.rxn_idx_to_bond_map[rxn_idx]
+                    bond_idx = self._bond_key_to_index(mol, bond_key)
+                    if bond_idx is not None:
+                        predictions_by_bond[bond_idx].append(float(pred_value))
 
             # Select minimum BDE per bond (most favorable fragmentation)
             bde_dict = {}

@@ -32,7 +32,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def parse_msp_file(msp_path: str, mol_files_dir: Optional[str] = None) -> List[Dict]:
+def parse_msp_file(
+    msp_path: str,
+    mol_files_dir: Optional[str] = None,
+    max_entries: int = 0,
+) -> List[Dict]:
     """
     Parse NIST MSP format file
 
@@ -41,6 +45,7 @@ def parse_msp_file(msp_path: str, mol_files_dir: Optional[str] = None) -> List[D
         mol_files_dir: Optional directory containing MOL files (e.g., "data/mol_files")
                        If provided, will load chemical structures from MOL files using ID linkage
                        when SMILES is not available in MSP
+        max_entries: Maximum MSP entries to parse before loading MOL files. 0 means all.
 
     Returns:
         entries: List of {name, smiles, mw, formula, spectrum, id}
@@ -62,6 +67,9 @@ def parse_msp_file(msp_path: str, mol_files_dir: Optional[str] = None) -> List[D
             if line.startswith('Name:'):
                 if current_entry:
                     entries.append(current_entry)
+                    if max_entries > 0 and len(entries) >= max_entries:
+                        current_entry = {}
+                        break
                 current_entry = {'name': line.split(':', 1)[1].strip()}
 
             elif line.startswith('MW:'):
@@ -103,7 +111,7 @@ def parse_msp_file(msp_path: str, mol_files_dir: Optional[str] = None) -> List[D
                         except ValueError:
                             pass  # Skip invalid lines
 
-    if current_entry:
+    if current_entry and (max_entries <= 0 or len(entries) < max_entries):
         entries.append(current_entry)
 
     # Load chemical structures from MOL files if directory provided

@@ -98,7 +98,6 @@ python scripts/train_gnn_minimal.py \
     --num-layers 14 \
     --num-heads 24 \
     --pooling-mode mean_add_max \
-    --molecular-ion-loss-weight 0.1 \
     --use-recurrent-refinement \
     --refinement-steps 4 \
     --refinement-max-steps 8 \

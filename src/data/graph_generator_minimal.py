@@ -91,6 +91,9 @@ class MinimalGraphGenerator:
         bde_cache_path: Optional[str] = None,
         use_bde_calculator: bool = False,
         bondnet_model: Optional[str] = "bdncm/20200808",
+        use_bde: bool = True,
+        use_mass_features: bool = True,
+        use_formula_features: bool = True,
         bde_min: float = 50.0,
         bde_max: float = 200.0,
         default_bde: float = 85.0
@@ -102,24 +105,30 @@ class MinimalGraphGenerator:
             bde_cache_path: Path to pre-computed BDE HDF5 cache
             use_bde_calculator: Enable on-the-fly BDE calculation
             bondnet_model: BonDNet model name or path
+            use_bde: Enable BDE edge feature values
+            use_mass_features: Enable exact/molecular mass graph features
+            use_formula_features: Enable formula-count graph features
             bde_min: Minimum BDE for normalization (kcal/mol)
             bde_max: Maximum BDE for normalization (kcal/mol)
             default_bde: Default BDE if cache miss and no calculator
         """
+        self.use_bde = use_bde
+        self.use_mass_features = use_mass_features
+        self.use_formula_features = use_formula_features
         self.bde_min = bde_min
         self.bde_max = bde_max
         self.default_bde = default_bde
 
         # Initialize featurizer
         self.featurizer = QCGNFeaturizer(
-            use_bde=True,
+            use_bde=use_bde,
             bde_min=bde_min,
             bde_max=bde_max
         )
 
         # Initialize BDE cache
         self.bde_cache = None
-        if bde_cache_path:
+        if use_bde and bde_cache_path:
             cache_path = Path(bde_cache_path)
             if cache_path.exists():
                 try:
@@ -135,9 +144,13 @@ class MinimalGraphGenerator:
 
         # Initialize BDE calculator (optional)
         self.bde_calculator = None
-        if use_bde_calculator:
+        if use_bde and use_bde_calculator:
             try:
-                self.bde_calculator = BDECalculator(model_name=bondnet_model)
+                model_path = Path(str(bondnet_model)) if bondnet_model else None
+                if model_path is not None and model_path.exists():
+                    self.bde_calculator = BDECalculator(model_path=str(model_path))
+                else:
+                    self.bde_calculator = BDECalculator(model_name=bondnet_model)
                 logger.info("BDE calculator initialized (on-the-fly mode)")
             except Exception as e:
                 logger.warning(f"Failed to initialize BDE calculator: {e}")
@@ -181,6 +194,12 @@ class MinimalGraphGenerator:
         feature_values.extend(
             counts[element] / COUNT_SCALE for element in GRAPH_FEATURE_ELEMENTS
         )
+        if not self.use_mass_features:
+            feature_values[0] = 0.0
+            feature_values[1] = 0.0
+        if not self.use_formula_features:
+            for idx in range(2, len(feature_values)):
+                feature_values[idx] = 0.0
         molecular_ion_mz = max(1, int(round(exact_mass)))
         return np.array(feature_values, dtype=np.float32), exact_mass, molecular_ion_mz
 
@@ -200,6 +219,10 @@ class MinimalGraphGenerator:
         Returns:
             bde_dict: {bond_idx: BDE (kcal/mol)}
         """
+        if not self.use_bde:
+            num_bonds = mol.GetNumBonds()
+            return {i: self.default_bde for i in range(num_bonds)}
+
         # Priority 1: Check cache
         if self.bde_cache:
             bde_dict = self.bde_cache.get(smiles)
