@@ -23,6 +23,53 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GATv2Conv, global_add_pool, global_max_pool, global_mean_pool
 logger = logging.getLogger(__name__)
+
+
+def neutral_loss_to_mz_spectrum(
+    neutral_loss_spectrum: torch.Tensor,
+    molecular_ion_mz: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Map neutral-loss bins back to absolute m/z bins.
+
+    loss = molecular_ion_mz - fragment_mz, so
+    fragment_mz = molecular_ion_mz - loss.
+    """
+    output_dim = neutral_loss_spectrum.size(-1)
+    device = neutral_loss_spectrum.device
+    loss_idx = torch.arange(0, output_dim, dtype=torch.long, device=device).view(1, -1)
+    parent_mz = molecular_ion_mz.view(-1, 1).to(device=device, dtype=torch.long)
+    mz_idx = parent_mz - loss_idx - 1
+    valid = (mz_idx >= 0) & (mz_idx < output_dim)
+    safe_idx = mz_idx.clamp(min=0, max=output_dim - 1)
+    mz_spectrum = torch.zeros_like(neutral_loss_spectrum)
+    mz_spectrum.scatter_add_(
+        1,
+        safe_idx,
+        neutral_loss_spectrum * valid.to(neutral_loss_spectrum.dtype),
+    )
+    return mz_spectrum
+
+
+def fuse_neutral_loss_prediction(
+    mz_spectrum: torch.Tensor,
+    neutral_loss_spectrum: Optional[torch.Tensor],
+    molecular_ion_mz: Optional[torch.Tensor],
+    fusion_weight: float,
+) -> torch.Tensor:
+    """Blend direct m/z prediction with neutral-loss-derived m/z prediction."""
+    if neutral_loss_spectrum is None or molecular_ion_mz is None:
+        return mz_spectrum
+    fusion = min(max(float(fusion_weight), 0.0), 1.0)
+    if fusion <= 0:
+        return mz_spectrum
+    neutral_mz_spectrum = neutral_loss_to_mz_spectrum(
+        neutral_loss_spectrum,
+        molecular_ion_mz,
+    )
+    return (1.0 - fusion) * mz_spectrum + fusion * neutral_mz_spectrum
+
+
 class StableACTRecurrentSpectralRefinementBlock(nn.Module):
     """
     Stable ACT Recurrent Spectral Refinement Block.
@@ -281,6 +328,7 @@ class QCGN2oEI_Minimal(nn.Module):
         pooling_mode: str = "mean_add_max",
         graph_feature_dim: int = 17,
         use_graph_features: bool = True,
+        use_neutral_loss_head: bool = False,
     ):
         super().__init__()
         if hidden_dim % num_heads != 0:
@@ -312,6 +360,7 @@ class QCGN2oEI_Minimal(nn.Module):
         self.pooling_mode = pooling_mode
         self.graph_feature_dim = graph_feature_dim
         self.use_graph_features = use_graph_features and graph_feature_dim > 0
+        self.use_neutral_loss_head = use_neutral_loss_head
         self.node_encoder = nn.Sequential(
             nn.Linear(node_dim, hidden_dim),
             nn.ELU(),
@@ -385,6 +434,19 @@ class QCGN2oEI_Minimal(nn.Module):
             nn.Linear(hidden_dim, output_dim),
             nn.Softmax(dim=-1),
         )
+        if self.use_neutral_loss_head:
+            self.neutral_loss_head = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim * 2),
+                nn.ELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.ELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, output_dim),
+                nn.Softmax(dim=-1),
+            )
+        else:
+            self.neutral_loss_head = None
         logger.info("QCGN2oEI_Minimal initialized:")
         logger.info(f"  Node dim: {node_dim}")
         logger.info(f"  Edge dim: {edge_dim}")
@@ -403,6 +465,7 @@ class QCGN2oEI_Minimal(nn.Module):
         logger.info(f"  Pooling mode: {pooling_mode}")
         logger.info(f"  Use graph features: {self.use_graph_features}")
         logger.info(f"  Graph feature dim: {graph_feature_dim}")
+        logger.info(f"  Use neutral loss head: {self.use_neutral_loss_head}")
         total_params = sum(p.numel() for p in self.parameters())
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         logger.info(f"  Total parameters: {total_params:,}")
@@ -460,6 +523,7 @@ class QCGN2oEI_Minimal(nn.Module):
         refinement_steps: Optional[int] = None,
         return_intermediate: bool = False,
         return_act_stats: bool = False,
+        return_aux_outputs: bool = False,
         force_no_act: bool = False,
     ):
         """
@@ -482,6 +546,8 @@ class QCGN2oEI_Minimal(nn.Module):
                 This mode uses fixed-loop refinement.
             return_act_stats:
                 If True, return ACT stats.
+            return_aux_outputs:
+                If True, append optional auxiliary predictions.
             force_no_act:
                 If True, use fixed-loop refinement even if ACT is enabled.
         Returns:
@@ -563,12 +629,23 @@ class QCGN2oEI_Minimal(nn.Module):
                         force_no_act=force_no_act,
                     )
         spectrum = self.spectrum_head(graph_repr)
+        aux_outputs: Dict[str, torch.Tensor] = {}
+        if return_aux_outputs and self.neutral_loss_head is not None:
+            aux_outputs["neutral_loss_spectrum"] = self.neutral_loss_head(graph_repr)
         if return_intermediate and return_act_stats:
+            if return_aux_outputs:
+                return spectrum, intermediate_spectra, act_stats, aux_outputs
             return spectrum, intermediate_spectra, act_stats
         if return_intermediate:
+            if return_aux_outputs:
+                return spectrum, intermediate_spectra, aux_outputs
             return spectrum, intermediate_spectra
         if return_act_stats:
+            if return_aux_outputs:
+                return spectrum, act_stats, aux_outputs
             return spectrum, act_stats
+        if return_aux_outputs:
+            return spectrum, aux_outputs
         return spectrum
     def get_model_info(self) -> Dict[str, Any]:
         """
@@ -598,6 +675,7 @@ class QCGN2oEI_Minimal(nn.Module):
             "pooling_mode": self.pooling_mode,
             "graph_feature_dim": self.graph_feature_dim,
             "use_graph_features": self.use_graph_features,
+            "use_neutral_loss_head": self.use_neutral_loss_head,
             "total_params": total_params,
             "trainable_params": trainable_params,
             "memory_estimate_mb": total_params * 4 / (1024 * 1024),

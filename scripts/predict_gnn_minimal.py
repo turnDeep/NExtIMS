@@ -21,7 +21,10 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
+from src.models.qcgn2oei_minimal import (
+    QCGN2oEI_Minimal,
+    fuse_neutral_loss_prediction,
+)
 from src.data.graph_generator_minimal import MinimalGraphGenerator
 logging.basicConfig(
     level=logging.INFO,
@@ -110,6 +113,9 @@ def get_model_config_from_checkpoint(
         "use_graph_features": bool(
             pick("use_graph_features", False)
         ),
+        "use_neutral_loss_head": bool(
+            pick("use_neutral_loss_head", False)
+        ),
     }
     # CLI overrides
     if args.refinement_steps is not None:
@@ -162,6 +168,24 @@ def build_model_from_checkpoint(
         )
     model.eval()
     return model
+
+
+def get_neutral_loss_fusion_weight(
+    checkpoint: Dict[str, Any],
+    args,
+) -> float:
+    """Use CLI override first, then checkpoint training args."""
+    if args.neutral_loss_fusion_weight is not None:
+        return float(args.neutral_loss_fusion_weight)
+    train_args = checkpoint.get("args", {})
+    if "neutral_loss_fusion_weight" in train_args:
+        return float(train_args["neutral_loss_fusion_weight"])
+    model_info = checkpoint.get("model_info", {})
+    if model_info.get("use_neutral_loss_head", False):
+        return 0.30
+    return 0.0
+
+
 def smiles_to_graph(
     smiles: str,
     graph_generator: MinimalGraphGenerator,
@@ -186,14 +210,16 @@ def predict_spectrum(
     refinement_steps: Optional[int] = None,
     force_no_act: bool = False,
     return_act_stats: bool = True,
+    neutral_loss_fusion_weight: float = 0.0,
 ) -> Tuple[np.ndarray, Optional[Dict[str, Any]]]:
     """
     Predict EI-MS spectrum for one graph.
     """
     graph = graph.to(device)
     with torch.no_grad():
+        return_aux_outputs = bool(getattr(model, "use_neutral_loss_head", False))
         if return_act_stats:
-            spectrum, act_stats = model(
+            outputs = model(
                 x=graph.x,
                 edge_index=graph.edge_index,
                 edge_attr=graph.edge_attr,
@@ -201,10 +227,15 @@ def predict_spectrum(
                 graph_features=getattr(graph, "graph_features", None),
                 refinement_steps=refinement_steps,
                 return_act_stats=True,
+                return_aux_outputs=return_aux_outputs,
                 force_no_act=force_no_act,
             )
+            if return_aux_outputs:
+                spectrum, act_stats, aux_outputs = outputs
+            else:
+                spectrum, act_stats = outputs
         else:
-            spectrum = model(
+            outputs = model(
                 x=graph.x,
                 edge_index=graph.edge_index,
                 edge_attr=graph.edge_attr,
@@ -212,9 +243,21 @@ def predict_spectrum(
                 graph_features=getattr(graph, "graph_features", None),
                 refinement_steps=refinement_steps,
                 return_act_stats=False,
+                return_aux_outputs=return_aux_outputs,
                 force_no_act=force_no_act,
             )
             act_stats = None
+            if return_aux_outputs:
+                spectrum, aux_outputs = outputs
+            else:
+                spectrum = outputs
+        if return_aux_outputs:
+            spectrum = fuse_neutral_loss_prediction(
+                mz_spectrum=spectrum,
+                neutral_loss_spectrum=aux_outputs.get("neutral_loss_spectrum"),
+                molecular_ion_mz=getattr(graph, "molecular_ion_mz", None),
+                fusion_weight=neutral_loss_fusion_weight,
+            )
     spectrum_np = spectrum.squeeze(0).detach().cpu().numpy()
 
     # Normalize to relative intensity (base peak = 100)
@@ -449,6 +492,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not return/print ACT statistics",
     )
+    parser.add_argument(
+        "--neutral-loss-fusion-weight",
+        type=float,
+        default=None,
+        help=(
+            "Override neutral-loss fusion weight. "
+            "If omitted, use checkpoint training setting."
+        ),
+    )
     return parser
 def main():
     parser = build_arg_parser()
@@ -464,6 +516,10 @@ def main():
         checkpoint=checkpoint,
         args=args,
         device=args.device,
+    )
+    neutral_loss_fusion_weight = get_neutral_loss_fusion_weight(
+        checkpoint=checkpoint,
+        args=args,
     )
     graph_generator = MinimalGraphGenerator(
         bde_cache_path=args.bde_cache,
@@ -482,6 +538,7 @@ def main():
         refinement_steps=args.refinement_steps,
         force_no_act=args.force_no_act,
         return_act_stats=not args.no_act_stats,
+        neutral_loss_fusion_weight=neutral_loss_fusion_weight,
     )
     peaks = get_top_peaks(
         spectrum=spectrum,
@@ -497,6 +554,7 @@ def main():
     if args.refinement_steps is not None:
         print(f"Refinement steps override: {args.refinement_steps}")
     print(f"Force no ACT: {args.force_no_act}")
+    print(f"Neutral-loss fusion weight: {neutral_loss_fusion_weight:.2f}")
     if act_stats is not None:
         print("")
         print("ACT stats:")

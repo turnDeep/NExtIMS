@@ -15,15 +15,19 @@ import sys
 import argparse
 import logging
 import random
+from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torch_geometric.data import Batch
 from tqdm import tqdm
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import rdFingerprintGenerator
+from rdkit.ML.Cluster import Butina
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
@@ -49,6 +53,8 @@ class NISTGraphDataset(Dataset):
         use_bde: bool = True,
         use_mass_features: bool = True,
         use_formula_features: bool = True,
+        use_fragment_candidates: bool = False,
+        fragment_mask_window: int = 2,
         max_samples: int = 0,
         min_mz: int = 1,
         max_mz: int = 1000,
@@ -62,6 +68,9 @@ class NISTGraphDataset(Dataset):
             use_bde=use_bde,
             use_mass_features=use_mass_features,
             use_formula_features=use_formula_features,
+            use_fragment_candidates=use_fragment_candidates,
+            fragment_output_dim=max_mz - min_mz + 1,
+            fragment_mask_window=fragment_mask_window,
             default_bde=85.0,
         )
         logger.info(f"Loading NIST data from {msp_path}")
@@ -102,11 +111,18 @@ class NISTGraphDataset(Dataset):
     def __getitem__(self, idx):
         item = self.data[idx]
         try:
+            metadata = {}
+            if "max_train_similarity" in item:
+                metadata["max_train_similarity"] = torch.tensor(
+                    [item["max_train_similarity"]],
+                    dtype=torch.float32,
+                )
             graph = self.graph_gen.mol_to_graph(
                 mol=item["mol"],
                 smiles=item["smiles"],
                 spectrum=item["spectrum"],
                 compound_name=item["name"],
+                **metadata,
             )
             return graph
         except ValueError:
@@ -121,12 +137,228 @@ def collate_pyg_graphs(batch_list):
     return Batch.from_data_list(batch_list)
 
 
+class SpectrumAugmentedDataset(Dataset):
+    """
+    Applies light target-spectrum augmentation to the training subset only.
+    The graph itself is cloned, so validation and cached dataset entries stay unchanged.
+    """
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        intensity_jitter: float = 0.0,
+        peak_dropout: float = 0.0,
+        mz_spread: float = 0.0,
+    ):
+        self.dataset = dataset
+        self.intensity_jitter = max(float(intensity_jitter), 0.0)
+        self.peak_dropout = min(max(float(peak_dropout), 0.0), 1.0)
+        self.mz_spread = min(max(float(mz_spread), 0.0), 1.0)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def _augment_spectrum(self, spectrum: torch.Tensor) -> torch.Tensor:
+        original_shape = spectrum.shape
+        y = spectrum.view(-1).clone()
+        positive = y > 0
+
+        if self.intensity_jitter > 0 and positive.any():
+            noise = torch.randn_like(y) * self.intensity_jitter
+            y = torch.where(positive, y * (1.0 + noise), y)
+            y = torch.clamp(y, min=0.0)
+
+        if self.peak_dropout > 0 and positive.any():
+            max_intensity = torch.max(y)
+            minor_peak = positive & (y < 0.25 * max_intensity)
+            keep = torch.rand_like(y) >= self.peak_dropout
+            y = torch.where(minor_peak & ~keep, torch.zeros_like(y), y)
+
+        if self.mz_spread > 0 and positive.any():
+            spread = torch.zeros_like(y)
+            spread[1:] += y[:-1] * (self.mz_spread * 0.5)
+            spread[:-1] += y[1:] * (self.mz_spread * 0.5)
+            y = y * (1.0 - self.mz_spread) + spread
+
+        max_intensity = torch.max(y)
+        if max_intensity > 0:
+            y = y / max_intensity
+        return y.view(original_shape)
+
+    def __getitem__(self, idx):
+        graph = self.dataset[idx]
+        if graph is None or not hasattr(graph, "y"):
+            return graph
+        graph = graph.clone()
+        graph.y = self._augment_spectrum(graph.y)
+        return graph
+
+
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def _fingerprint_generator(radius: int, n_bits: int):
+    return rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
+
+
+def _morgan_fingerprints(
+    dataset: NISTGraphDataset,
+    indices: Sequence[int],
+    radius: int,
+    n_bits: int,
+):
+    fpgen = _fingerprint_generator(radius=radius, n_bits=n_bits)
+    fps = []
+    valid_indices = []
+    for idx in indices:
+        mol = dataset.data[idx]["mol"]
+        try:
+            fps.append(fpgen.GetFingerprint(mol))
+            valid_indices.append(idx)
+        except Exception:
+            continue
+    return valid_indices, fps
+
+
+def annotate_validation_similarity(
+    dataset: NISTGraphDataset,
+    train_indices: Sequence[int],
+    val_indices: Sequence[int],
+    radius: int,
+    n_bits: int,
+    max_train_refs: int,
+    seed: int,
+) -> Dict[str, int]:
+    """
+    Add max_train_similarity to validation entries using Morgan/Tanimoto.
+    This is diagnostic metadata only and is not fed to the model.
+    """
+    train_indices = list(train_indices)
+    if max_train_refs > 0 and len(train_indices) > max_train_refs:
+        rng = random.Random(seed)
+        train_indices = rng.sample(train_indices, max_train_refs)
+        logger.info(
+            "Similarity bucket annotation uses %d sampled train references.",
+            len(train_indices),
+        )
+
+    _, train_fps = _morgan_fingerprints(
+        dataset,
+        train_indices,
+        radius=radius,
+        n_bits=n_bits,
+    )
+    if not train_fps:
+        logger.warning("No train fingerprints were available for similarity buckets.")
+        return {}
+
+    bucket_counts: Counter = Counter()
+    fpgen = _fingerprint_generator(radius=radius, n_bits=n_bits)
+    for idx in val_indices:
+        item = dataset.data[idx]
+        try:
+            val_fp = fpgen.GetFingerprint(item["mol"])
+            sims = DataStructs.BulkTanimotoSimilarity(val_fp, train_fps)
+            max_sim = float(max(sims)) if sims else 0.0
+        except Exception:
+            max_sim = 0.0
+        item["max_train_similarity"] = max_sim
+        if max_sim >= 0.8:
+            bucket_counts["near"] += 1
+        elif max_sim >= 0.6:
+            bucket_counts["mid"] += 1
+        else:
+            bucket_counts["far"] += 1
+    return dict(bucket_counts)
+
+
+def build_similarity_balanced_sampler(
+    dataset: NISTGraphDataset,
+    train_indices: Sequence[int],
+    radius: int,
+    n_bits: int,
+    threshold: float,
+    exact_max_samples: int,
+    strength: float,
+    seed: int,
+) -> Optional[WeightedRandomSampler]:
+    """
+    Build a cluster-balanced sampler from Morgan fingerprints.
+    For small/medium subsets it uses exact Butina clustering. For larger sets it
+    falls back to deterministic on-bit buckets to avoid O(n^2) memory/time.
+    """
+    train_indices = list(train_indices)
+    valid_indices, fps = _morgan_fingerprints(
+        dataset,
+        train_indices,
+        radius=radius,
+        n_bits=n_bits,
+    )
+    if len(fps) != len(train_indices):
+        logger.warning(
+            "Similarity sampler skipped: fingerprint count mismatch (%d/%d).",
+            len(fps),
+            len(train_indices),
+        )
+        return None
+
+    cluster_ids: List[int] = [0] * len(fps)
+    if len(fps) <= exact_max_samples:
+        distances = []
+        for i in range(1, len(fps)):
+            sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[:i])
+            distances.extend(1.0 - sim for sim in sims)
+        clusters = Butina.ClusterData(
+            distances,
+            len(fps),
+            distThresh=1.0 - threshold,
+            isDistData=True,
+        )
+        for cluster_idx, members in enumerate(clusters):
+            for member in members:
+                cluster_ids[member] = cluster_idx
+        logger.info(
+            "Similarity-balanced sampler: exact Butina clusters=%d threshold=%.2f",
+            len(clusters),
+            threshold,
+        )
+    else:
+        buckets: Dict[Tuple[int, ...], int] = {}
+        for local_idx, fp in enumerate(fps):
+            on_bits = tuple(sorted(int(bit) // 64 for bit in fp.GetOnBits())[:12])
+            if on_bits not in buckets:
+                buckets[on_bits] = len(buckets)
+            cluster_ids[local_idx] = buckets[on_bits]
+        logger.info(
+            "Similarity-balanced sampler: fallback fingerprint buckets=%d "
+            "(exact clustering skipped for %d samples)",
+            len(buckets),
+            len(fps),
+        )
+
+    cluster_sizes = Counter(cluster_ids)
+    strength = max(float(strength), 0.0)
+    weights = [
+        float(cluster_sizes[cluster_id]) ** (-strength)
+        for cluster_id in cluster_ids
+    ]
+    sampler = WeightedRandomSampler(
+        weights=torch.DoubleTensor(weights),
+        num_samples=len(weights),
+        replacement=True,
+        generator=torch.Generator().manual_seed(seed),
+    )
+    logger.info(
+        "Similarity-balanced sampler active: min_cluster=%d max_cluster=%d",
+        min(cluster_sizes.values()),
+        max(cluster_sizes.values()),
+    )
+    return sampler
 
 
 def topk_recall_batch(
@@ -138,6 +370,173 @@ def topk_recall_batch(
     target_topk = torch.topk(target_spectrum, k=k, dim=-1).indices
     hits = (pred_topk.unsqueeze(-1) == target_topk.unsqueeze(1)).any(dim=1)
     return hits.float().mean(dim=-1)
+
+
+def weighted_cosine_similarity_loss(
+    predicted: torch.Tensor,
+    target: torch.Tensor,
+    mz_power: float = 2.0,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """Cosine loss after up-weighting high m/z diagnostic bins."""
+    output_dim = predicted.size(-1)
+    mz = torch.arange(
+        1,
+        output_dim + 1,
+        dtype=predicted.dtype,
+        device=predicted.device,
+    )
+    weights = (mz / float(output_dim)).pow(float(mz_power)).unsqueeze(0)
+    pred_norm = F.normalize(predicted * weights, p=2, dim=-1, eps=eps)
+    target_norm = F.normalize(target * weights, p=2, dim=-1, eps=eps)
+    return 1.0 - (pred_norm * target_norm).sum(dim=-1).mean()
+
+
+def build_neutral_loss_target(
+    target_spectrum: torch.Tensor,
+    molecular_ion_mz: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Convert m/z target bins to neutral-loss bins.
+
+    Neutral-loss bin 0 means M - m/z = 0, bin 60 means loss of 60 Da, etc.
+    """
+    output_dim = target_spectrum.size(-1)
+    device = target_spectrum.device
+    mz = torch.arange(1, output_dim + 1, dtype=torch.long, device=device).view(1, -1)
+    parent_mz = molecular_ion_mz.view(-1, 1).to(device=device, dtype=torch.long)
+    loss_idx = parent_mz - mz
+    valid = (loss_idx >= 0) & (loss_idx < output_dim)
+    safe_idx = loss_idx.clamp(min=0, max=output_dim - 1)
+    neutral_target = torch.zeros_like(target_spectrum)
+    neutral_target.scatter_add_(1, safe_idx, target_spectrum * valid.to(target_spectrum.dtype))
+    max_intensity = neutral_target.max(dim=-1, keepdim=True).values
+    neutral_target = torch.where(
+        max_intensity > 0,
+        neutral_target / max_intensity.clamp_min(1e-8),
+        neutral_target,
+    )
+    return neutral_target
+
+
+def neutral_loss_to_mz_spectrum(
+    neutral_loss_spectrum: torch.Tensor,
+    molecular_ion_mz: torch.Tensor,
+) -> torch.Tensor:
+    """Map a neutral-loss prediction back to m/z bins for final spectrum scoring."""
+    output_dim = neutral_loss_spectrum.size(-1)
+    device = neutral_loss_spectrum.device
+    loss_idx = torch.arange(0, output_dim, dtype=torch.long, device=device).view(1, -1)
+    parent_mz = molecular_ion_mz.view(-1, 1).to(device=device, dtype=torch.long)
+    mz_idx = parent_mz - loss_idx - 1
+    valid = (mz_idx >= 0) & (mz_idx < output_dim)
+    safe_idx = mz_idx.clamp(min=0, max=output_dim - 1)
+    mz_spectrum = torch.zeros_like(neutral_loss_spectrum)
+    mz_spectrum.scatter_add_(
+        1,
+        safe_idx,
+        neutral_loss_spectrum * valid.to(neutral_loss_spectrum.dtype),
+    )
+    return mz_spectrum
+
+
+def fragment_candidate_loss(
+    pred_spectrum: torch.Tensor,
+    fragment_candidate_mask: Optional[torch.Tensor],
+) -> torch.Tensor:
+    """Penalize probability mass placed outside structure-derived candidate bins."""
+    if fragment_candidate_mask is None:
+        return torch.zeros((), device=pred_spectrum.device)
+    mask = fragment_candidate_mask.to(device=pred_spectrum.device, dtype=pred_spectrum.dtype)
+    if mask.dim() == 1:
+        mask = mask.unsqueeze(0)
+    if mask.size(0) != pred_spectrum.size(0):
+        mask = mask.view(pred_spectrum.size(0), -1)
+    mask = mask.clamp(0.0, 1.0)
+    return (pred_spectrum * (1.0 - mask)).sum(dim=-1).mean()
+
+
+def parse_model_outputs(
+    outputs,
+    return_intermediate: bool,
+    return_act_stats: bool,
+    return_aux_outputs: bool,
+):
+    """Unpack model outputs while preserving the legacy forward API."""
+    aux_outputs = {}
+    if return_aux_outputs:
+        if return_intermediate and return_act_stats:
+            pred_spectrum, intermediate_spectra, act_stats, aux_outputs = outputs
+        elif return_intermediate:
+            pred_spectrum, intermediate_spectra, aux_outputs = outputs
+            act_stats = None
+        elif return_act_stats:
+            pred_spectrum, act_stats, aux_outputs = outputs
+            intermediate_spectra = []
+        else:
+            pred_spectrum, aux_outputs = outputs
+            intermediate_spectra = []
+            act_stats = None
+    else:
+        if return_intermediate and return_act_stats:
+            pred_spectrum, intermediate_spectra, act_stats = outputs
+        elif return_intermediate:
+            pred_spectrum, intermediate_spectra = outputs
+            act_stats = None
+        elif return_act_stats:
+            pred_spectrum, act_stats = outputs
+            intermediate_spectra = []
+        else:
+            pred_spectrum = outputs
+            intermediate_spectra = []
+            act_stats = None
+    return pred_spectrum, intermediate_spectra, act_stats, aux_outputs
+
+
+def apply_auxiliary_prediction_losses(
+    pred_spectrum: torch.Tensor,
+    aux_outputs: Dict[str, torch.Tensor],
+    batch,
+    args,
+):
+    """
+    Apply optional prediction-space constraints and return the spectrum used for
+    main scoring plus the additional loss term.
+    """
+    extra_loss = torch.zeros((), device=pred_spectrum.device)
+    scoring_spectrum = pred_spectrum
+
+    neutral_loss_spectrum = aux_outputs.get("neutral_loss_spectrum")
+    if neutral_loss_spectrum is not None:
+        molecular_ion_mz = getattr(batch, "molecular_ion_mz", None)
+        if molecular_ion_mz is not None:
+            neutral_target = build_neutral_loss_target(batch.y, molecular_ion_mz)
+            extra_loss = extra_loss + args.neutral_loss_weight * cosine_similarity_loss(
+                neutral_loss_spectrum,
+                neutral_target,
+            )
+            if args.neutral_loss_fusion_weight > 0:
+                neutral_mz_spectrum = neutral_loss_to_mz_spectrum(
+                    neutral_loss_spectrum,
+                    molecular_ion_mz,
+                )
+                fusion = min(max(float(args.neutral_loss_fusion_weight), 0.0), 1.0)
+                scoring_spectrum = (1.0 - fusion) * scoring_spectrum + fusion * neutral_mz_spectrum
+
+    if args.weighted_cosine_loss_weight > 0:
+        extra_loss = extra_loss + args.weighted_cosine_loss_weight * weighted_cosine_similarity_loss(
+            scoring_spectrum,
+            batch.y,
+            mz_power=args.weighted_cosine_mz_power,
+        )
+
+    if args.fragment_candidate_loss_weight > 0:
+        extra_loss = extra_loss + args.fragment_candidate_loss_weight * fragment_candidate_loss(
+            scoring_spectrum,
+            getattr(batch, "fragment_candidate_mask", None),
+        )
+
+    return scoring_spectrum, extra_loss
 def _forward_and_loss(
     model: nn.Module,
     batch,
@@ -164,11 +563,12 @@ def _forward_and_loss(
     use_intermediate = bool(
         args.use_recurrent_refinement and args.use_intermediate_loss and training
     )
+    return_aux_outputs = bool(args.use_neutral_loss_head)
     graph_features = getattr(batch, "graph_features", None)
     if use_intermediate:
         # Intermediate supervision uses fixed-loop mode.
         if use_act_stats:
-            pred_spectrum, intermediate_spectra, act_stats = model(
+            outputs = model(
                 x=batch.x,
                 edge_index=batch.edge_index,
                 edge_attr=batch.edge_attr,
@@ -177,10 +577,11 @@ def _forward_and_loss(
                 refinement_steps=args.refinement_steps,
                 return_intermediate=True,
                 return_act_stats=True,
+                return_aux_outputs=return_aux_outputs,
                 force_no_act=True,
             )
         else:
-            pred_spectrum, intermediate_spectra = model(
+            outputs = model(
                 x=batch.x,
                 edge_index=batch.edge_index,
                 edge_attr=batch.edge_attr,
@@ -189,9 +590,21 @@ def _forward_and_loss(
                 refinement_steps=args.refinement_steps,
                 return_intermediate=True,
                 return_act_stats=False,
+                return_aux_outputs=return_aux_outputs,
                 force_no_act=True,
             )
-            act_stats = None
+        pred_spectrum, intermediate_spectra, act_stats, aux_outputs = parse_model_outputs(
+            outputs,
+            return_intermediate=True,
+            return_act_stats=use_act_stats,
+            return_aux_outputs=return_aux_outputs,
+        )
+        pred_spectrum, extra_loss = apply_auxiliary_prediction_losses(
+            pred_spectrum,
+            aux_outputs,
+            batch,
+            args,
+        )
         main_loss = cosine_similarity_loss(pred_spectrum, batch.y)
         if len(intermediate_spectra) > 0:
             aux_loss = torch.zeros((), device=batch.y.device)
@@ -209,10 +622,11 @@ def _forward_and_loss(
             main_loss
             + args.intermediate_loss_weight * aux_loss
             + args.act_loss_weight * act_loss
+            + extra_loss
         )
         return loss, main_loss, act_loss, aux_loss, pred_spectrum, act_stats
     if use_act_stats:
-        pred_spectrum, act_stats = model(
+        outputs = model(
             x=batch.x,
             edge_index=batch.edge_index,
             edge_attr=batch.edge_attr,
@@ -220,7 +634,20 @@ def _forward_and_loss(
             graph_features=graph_features,
             refinement_steps=args.refinement_steps,
             return_act_stats=True,
+            return_aux_outputs=return_aux_outputs,
             force_no_act=args.force_no_act_eval and not training,
+        )
+        pred_spectrum, _, act_stats, aux_outputs = parse_model_outputs(
+            outputs,
+            return_intermediate=False,
+            return_act_stats=True,
+            return_aux_outputs=return_aux_outputs,
+        )
+        pred_spectrum, extra_loss = apply_auxiliary_prediction_losses(
+            pred_spectrum,
+            aux_outputs,
+            batch,
+            args,
         )
         main_loss = cosine_similarity_loss(pred_spectrum, batch.y)
         act_loss = act_stats["act_loss"]
@@ -228,21 +655,35 @@ def _forward_and_loss(
         loss = (
             main_loss
             + args.act_loss_weight * act_loss
+            + extra_loss
         )
         return loss, main_loss, act_loss, aux_loss, pred_spectrum, act_stats
-    pred_spectrum = model(
+    outputs = model(
         x=batch.x,
         edge_index=batch.edge_index,
         edge_attr=batch.edge_attr,
         batch=batch.batch,
         graph_features=graph_features,
         refinement_steps=args.refinement_steps if args.use_recurrent_refinement else None,
+        return_aux_outputs=return_aux_outputs,
         force_no_act=args.force_no_act_eval and not training,
+    )
+    pred_spectrum, _, _, aux_outputs = parse_model_outputs(
+        outputs,
+        return_intermediate=False,
+        return_act_stats=False,
+        return_aux_outputs=return_aux_outputs,
+    )
+    pred_spectrum, extra_loss = apply_auxiliary_prediction_losses(
+        pred_spectrum,
+        aux_outputs,
+        batch,
+        args,
     )
     main_loss = cosine_similarity_loss(pred_spectrum, batch.y)
     act_loss = torch.zeros((), device=batch.y.device)
     aux_loss = torch.zeros((), device=batch.y.device)
-    loss = main_loss
+    loss = main_loss + extra_loss
     return loss, main_loss, act_loss, aux_loss, pred_spectrum, None
 def train_epoch(
     model: nn.Module,
@@ -291,6 +732,11 @@ def train_epoch(
             total_cosine_sim += cosine_sim
             if act_stats is not None:
                 total_ponder_steps += act_stats["mean_ponder_steps"].item()
+            batch_size = batch.y.size(0)
+            total_top5 += topk_recall_batch(pred_spectrum, batch.y, 5).sum().item()
+            total_top10 += topk_recall_batch(pred_spectrum, batch.y, 10).sum().item()
+            total_top20 += topk_recall_batch(pred_spectrum, batch.y, 20).sum().item()
+            total_samples += batch_size
             num_batches += 1
             avg_loss = total_loss / num_batches
             avg_main_loss = total_main_loss / num_batches
@@ -312,6 +758,9 @@ def train_epoch(
         "act_loss": total_act_loss / num_batches,
         "aux_loss": total_aux_loss / num_batches,
         "cosine_sim": total_cosine_sim / num_batches,
+        "top5": total_top5 / total_samples,
+        "top10": total_top10 / total_samples,
+        "top20": total_top20 / total_samples,
         "mean_ponder_steps": total_ponder_steps / num_batches if total_ponder_steps > 0 else 0.0,
     }
     return metrics
@@ -337,6 +786,9 @@ def evaluate(
     total_top20 = 0.0
     total_samples = 0
     num_batches = 0
+    bucket_stats = defaultdict(
+        lambda: {"count": 0, "cosine": 0.0, "top5": 0.0, "top10": 0.0, "top20": 0.0}
+    )
     pbar = tqdm(dataloader, desc="Evaluating")
     for batch in pbar:
         if batch is None:
@@ -357,9 +809,30 @@ def evaluate(
         if act_stats is not None:
             total_ponder_steps += act_stats["mean_ponder_steps"].item()
         batch_size = batch.y.size(0)
-        total_top5 += topk_recall_batch(pred_spectrum, batch.y, 5).sum().item()
-        total_top10 += topk_recall_batch(pred_spectrum, batch.y, 10).sum().item()
-        total_top20 += topk_recall_batch(pred_spectrum, batch.y, 20).sum().item()
+        sample_cosine = F.cosine_similarity(pred_spectrum, batch.y, dim=-1)
+        sample_top5 = topk_recall_batch(pred_spectrum, batch.y, 5)
+        sample_top10 = topk_recall_batch(pred_spectrum, batch.y, 10)
+        sample_top20 = topk_recall_batch(pred_spectrum, batch.y, 20)
+        total_top5 += sample_top5.sum().item()
+        total_top10 += sample_top10.sum().item()
+        total_top20 += sample_top20.sum().item()
+        max_train_similarity = getattr(batch, "max_train_similarity", None)
+        if max_train_similarity is not None:
+            sims = max_train_similarity.view(-1).to(device)
+            bucket_masks = {
+                "near": sims >= 0.8,
+                "mid": (sims >= 0.6) & (sims < 0.8),
+                "far": sims < 0.6,
+            }
+            for bucket, mask in bucket_masks.items():
+                count = int(mask.sum().item())
+                if count == 0:
+                    continue
+                bucket_stats[bucket]["count"] += count
+                bucket_stats[bucket]["cosine"] += sample_cosine[mask].sum().item()
+                bucket_stats[bucket]["top5"] += sample_top5[mask].sum().item()
+                bucket_stats[bucket]["top10"] += sample_top10[mask].sum().item()
+                bucket_stats[bucket]["top20"] += sample_top20[mask].sum().item()
         total_samples += batch_size
         num_batches += 1
         avg_loss = total_loss / num_batches
@@ -385,6 +858,18 @@ def evaluate(
         "top20": total_top20 / total_samples,
         "mean_ponder_steps": total_ponder_steps / num_batches if total_ponder_steps > 0 else 0.0,
     }
+    if bucket_stats:
+        metrics["similarity_buckets"] = {
+            bucket: {
+                "count": values["count"],
+                "cosine_sim": values["cosine"] / values["count"],
+                "top5": values["top5"] / values["count"],
+                "top10": values["top10"] / values["count"],
+                "top20": values["top20"] / values["count"],
+            }
+            for bucket, values in bucket_stats.items()
+            if values["count"] > 0
+        }
     return metrics
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -405,6 +890,125 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-samples", type=int, default=0, help="Max samples to use. 0 means all.")
     parser.add_argument("--val-split", type=float, default=0.1, help="Validation split")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for split and training")
+    parser.add_argument(
+        "--annotate-similarity-buckets",
+        action="store_true",
+        help="Annotate validation samples with max train Morgan/Tanimoto similarity.",
+    )
+    parser.add_argument(
+        "--similarity-balanced-sampler",
+        action="store_true",
+        help="Use Morgan fingerprint cluster-balanced sampling for the training subset.",
+    )
+    parser.add_argument(
+        "--similarity-fp-radius",
+        type=int,
+        default=2,
+        help="Morgan fingerprint radius for similarity diagnostics/sampler.",
+    )
+    parser.add_argument(
+        "--similarity-fp-bits",
+        type=int,
+        default=2048,
+        help="Morgan fingerprint bit size for similarity diagnostics/sampler.",
+    )
+    parser.add_argument(
+        "--similarity-cluster-threshold",
+        type=float,
+        default=0.8,
+        help="Tanimoto threshold used by exact Butina clustering.",
+    )
+    parser.add_argument(
+        "--similarity-cluster-max-exact",
+        type=int,
+        default=3000,
+        help="Maximum training samples for exact O(n^2) Butina clustering.",
+    )
+    parser.add_argument(
+        "--similarity-sampler-strength",
+        type=float,
+        default=1.0,
+        help="Cluster balancing strength. 1.0 gives inverse cluster-size weights.",
+    )
+    parser.add_argument(
+        "--similarity-max-train-refs",
+        type=int,
+        default=10000,
+        help="Maximum train fingerprints used when annotating validation similarity.",
+    )
+    parser.add_argument(
+        "--spectrum-augment-intensity-jitter",
+        type=float,
+        default=0.0,
+        help="Training-only multiplicative intensity jitter stddev.",
+    )
+    parser.add_argument(
+        "--spectrum-augment-peak-dropout",
+        type=float,
+        default=0.0,
+        help="Training-only dropout probability for minor target peaks.",
+    )
+    parser.add_argument(
+        "--spectrum-augment-mz-spread",
+        type=float,
+        default=0.0,
+        help="Training-only fraction of target intensity spread to +/-1 m/z bins.",
+    )
+    neutral_loss_group = parser.add_mutually_exclusive_group()
+    neutral_loss_group.add_argument(
+        "--use-neutral-loss-head",
+        dest="use_neutral_loss_head",
+        action="store_true",
+        default=True,
+        help="Enable the neutral-loss prediction head (default).",
+    )
+    neutral_loss_group.add_argument(
+        "--no-neutral-loss-head",
+        dest="use_neutral_loss_head",
+        action="store_false",
+        help="Disable the neutral-loss prediction head.",
+    )
+    parser.add_argument(
+        "--neutral-loss-weight",
+        type=float,
+        default=0.05,
+        help="Loss weight for the neutral-loss auxiliary head.",
+    )
+    parser.add_argument(
+        "--neutral-loss-fusion-weight",
+        type=float,
+        default=0.30,
+        help="Blend neutral-loss head remapped to m/z into scored prediction.",
+    )
+    parser.add_argument(
+        "--weighted-cosine-loss-weight",
+        type=float,
+        default=0.0,
+        help="Additional mass-weighted cosine loss weight.",
+    )
+    parser.add_argument(
+        "--weighted-cosine-mz-power",
+        type=float,
+        default=2.0,
+        help="m/z exponent for mass-weighted cosine loss.",
+    )
+    parser.add_argument(
+        "--use-fragment-candidate-mask",
+        action="store_true",
+        help="Attach structure-derived fragment candidate masks to graphs.",
+    )
+    parser.add_argument(
+        "--fragment-candidate-loss-weight",
+        type=float,
+        default=0.0,
+        help="Penalty weight for predicted probability outside fragment candidate masks.",
+    )
+    parser.add_argument(
+        "--fragment-mask-window",
+        type=int,
+        default=2,
+        help="+/- m/z window marked around fragment candidate masses.",
+    )
     parser.add_argument("--device", type=str, default="cuda", help="Device: cuda or cpu")
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--save-interval", type=int, default=10, help="Save checkpoint every N epochs")
@@ -507,6 +1111,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main():
     parser = build_arg_parser()
     args = parser.parse_args()
+    if args.fragment_candidate_loss_weight > 0 and not args.use_fragment_candidate_mask:
+        args.use_fragment_candidate_mask = True
     set_seed(args.seed)
     if args.device == "cuda" and not torch.cuda.is_available():
         logger.warning("CUDA was requested but is not available. Falling back to CPU.")
@@ -545,6 +1151,22 @@ def main():
     logger.info(f"Use BDE: {not args.no_bde}")
     logger.info(f"Use mass features: {not args.no_mass_features}")
     logger.info(f"Use formula features: {not args.no_formula_features}")
+    logger.info(f"Annotate similarity buckets: {args.annotate_similarity_buckets}")
+    logger.info(f"Similarity-balanced sampler: {args.similarity_balanced_sampler}")
+    logger.info(
+        "Spectrum augmentation: "
+        f"jitter={args.spectrum_augment_intensity_jitter}, "
+        f"dropout={args.spectrum_augment_peak_dropout}, "
+        f"mz_spread={args.spectrum_augment_mz_spread}"
+    )
+    logger.info(f"Use neutral loss head: {args.use_neutral_loss_head}")
+    logger.info(f"Neutral loss weight: {args.neutral_loss_weight}")
+    logger.info(f"Neutral loss fusion weight: {args.neutral_loss_fusion_weight}")
+    logger.info(f"Weighted cosine loss weight: {args.weighted_cosine_loss_weight}")
+    logger.info(f"Weighted cosine m/z power: {args.weighted_cosine_mz_power}")
+    logger.info(f"Use fragment candidate mask: {args.use_fragment_candidate_mask}")
+    logger.info(f"Fragment candidate loss weight: {args.fragment_candidate_loss_weight}")
+    logger.info(f"Fragment mask window: {args.fragment_mask_window}")
     logger.info("")
     dataset = NISTGraphDataset(
         msp_path=args.nist_msp,
@@ -554,6 +1176,8 @@ def main():
         use_bde=not args.no_bde,
         use_mass_features=not args.no_mass_features,
         use_formula_features=not args.no_formula_features,
+        use_fragment_candidates=args.use_fragment_candidate_mask,
+        fragment_mask_window=args.fragment_mask_window,
         max_samples=args.max_samples,
     )
     val_size = int(len(dataset) * args.val_split)
@@ -567,12 +1191,53 @@ def main():
         [train_size, val_size],
         generator=torch.Generator().manual_seed(args.seed),
     )
+    train_indices = list(train_dataset.indices)
+    val_indices = list(val_dataset.indices)
+    if args.annotate_similarity_buckets:
+        bucket_counts = annotate_validation_similarity(
+            dataset=dataset,
+            train_indices=train_indices,
+            val_indices=val_indices,
+            radius=args.similarity_fp_radius,
+            n_bits=args.similarity_fp_bits,
+            max_train_refs=args.similarity_max_train_refs,
+            seed=args.seed,
+        )
+        if bucket_counts:
+            logger.info(
+                "Validation similarity buckets: %s",
+                ", ".join(f"{key}={value}" for key, value in sorted(bucket_counts.items())),
+            )
+    train_sampler = None
+    if args.similarity_balanced_sampler:
+        train_sampler = build_similarity_balanced_sampler(
+            dataset=dataset,
+            train_indices=train_indices,
+            radius=args.similarity_fp_radius,
+            n_bits=args.similarity_fp_bits,
+            threshold=args.similarity_cluster_threshold,
+            exact_max_samples=args.similarity_cluster_max_exact,
+            strength=args.similarity_sampler_strength,
+            seed=args.seed,
+        )
+    if (
+        args.spectrum_augment_intensity_jitter > 0
+        or args.spectrum_augment_peak_dropout > 0
+        or args.spectrum_augment_mz_spread > 0
+    ):
+        train_dataset = SpectrumAugmentedDataset(
+            train_dataset,
+            intensity_jitter=args.spectrum_augment_intensity_jitter,
+            peak_dropout=args.spectrum_augment_peak_dropout,
+            mz_spread=args.spectrum_augment_mz_spread,
+        )
     logger.info(f"Train size: {train_size:,}")
     logger.info(f"Val size: {val_size:,}")
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
         generator=torch.Generator().manual_seed(args.seed),
         num_workers=args.num_workers,
         collate_fn=collate_pyg_graphs,
@@ -606,6 +1271,7 @@ def main():
         pooling_mode=args.pooling_mode,
         graph_feature_dim=GRAPH_FEATURE_DIM,
         use_graph_features=not args.no_graph_features,
+        use_neutral_loss_head=args.use_neutral_loss_head,
     ).to(args.device)
     model_info = model.get_model_info()
     logger.info("Model info:")
@@ -638,6 +1304,9 @@ def main():
             f"ACT Loss: {train_metrics['act_loss']:.4f}, "
             f"Aux Loss: {train_metrics['aux_loss']:.4f}, "
             f"Cosine Sim: {train_metrics['cosine_sim']:.4f}, "
+            f"Top5: {train_metrics['top5']:.4f}, "
+            f"Top10: {train_metrics['top10']:.4f}, "
+            f"Top20: {train_metrics['top20']:.4f}, "
             f"Ponder: {train_metrics['mean_ponder_steps']:.2f}"
         )
         val_metrics = evaluate(
@@ -658,6 +1327,26 @@ def main():
             f"Top20: {val_metrics['top20']:.4f}, "
             f"Ponder: {val_metrics['mean_ponder_steps']:.2f}"
         )
+        logger.info(
+            "Gap - "
+            f"Cosine(train-val): {train_metrics['cosine_sim'] - val_metrics['cosine_sim']:.4f}, "
+            f"Top5(train-val): {train_metrics['top5'] - val_metrics['top5']:.4f}, "
+            f"Top10(train-val): {train_metrics['top10'] - val_metrics['top10']:.4f}, "
+            f"Top20(train-val): {train_metrics['top20'] - val_metrics['top20']:.4f}"
+        )
+        for bucket, bucket_metrics in sorted(
+            val_metrics.get("similarity_buckets", {}).items()
+        ):
+            logger.info(
+                "Val[%s] - Count: %d, Cosine Sim: %.4f, Top5: %.4f, "
+                "Top10: %.4f, Top20: %.4f",
+                bucket,
+                bucket_metrics["count"],
+                bucket_metrics["cosine_sim"],
+                bucket_metrics["top5"],
+                bucket_metrics["top10"],
+                bucket_metrics["top20"],
+            )
         if val_metrics["cosine_sim"] > best_val_cosine:
             best_val_cosine = val_metrics["cosine_sim"]
             torch.save(
@@ -666,6 +1355,7 @@ def main():
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_cosine_sim": best_val_cosine,
+                    "train_metrics": train_metrics,
                     "val_metrics": val_metrics,
                     "args": vars(args),
                     "model_info": model.get_model_info(),
@@ -681,6 +1371,7 @@ def main():
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_cosine_sim": val_metrics["cosine_sim"],
+                    "train_metrics": train_metrics,
                     "val_metrics": val_metrics,
                     "args": vars(args),
                     "model_info": model.get_model_info(),

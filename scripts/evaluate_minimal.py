@@ -57,7 +57,10 @@ RDLogger.DisableLog('rdApp.*')
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
+from src.models.qcgn2oei_minimal import (
+    QCGN2oEI_Minimal,
+    fuse_neutral_loss_prediction,
+)
 from src.data.graph_generator_minimal import MinimalGraphGenerator
 from src.data.nist_dataset import parse_msp_file, peaks_to_spectrum
 
@@ -134,7 +137,14 @@ class ModelEvaluator:
             "pooling_mode": str(pick("pooling_mode", "mean")),
             "graph_feature_dim": int(pick("graph_feature_dim", 0)),
             "use_graph_features": bool(pick("use_graph_features", False)),
+            "use_neutral_loss_head": bool(pick("use_neutral_loss_head", False)),
         }
+        self.neutral_loss_fusion_weight = float(
+            pick(
+                "neutral_loss_fusion_weight",
+                0.30 if self.config["use_neutral_loss_head"] else 0.0,
+            )
+        )
 
         self.model = QCGN2oEI_Minimal(**self.config)
 
@@ -151,6 +161,7 @@ class ModelEvaluator:
 
         logger.info(f"Model loaded successfully on {self.device}")
         logger.info(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
+        logger.info(f"Neutral-loss fusion weight: {self.neutral_loss_fusion_weight:.2f}")
 
     @staticmethod
     def cosine_similarity_metric(pred: np.ndarray, target: np.ndarray) -> float:
@@ -286,7 +297,8 @@ class ModelEvaluator:
             # Inference
             start_time = time.time()
             with torch.no_grad():
-                pred = self.model(
+                return_aux_outputs = bool(self.config.get("use_neutral_loss_head", False))
+                outputs = self.model(
                     x=batch_graph.x,
                     edge_index=batch_graph.edge_index,
                     edge_attr=batch_graph.edge_attr,
@@ -294,10 +306,19 @@ class ModelEvaluator:
                     graph_features=getattr(batch_graph, "graph_features", None),
                     refinement_steps=self.config.get("refinement_steps"),
                     return_act_stats=False,
+                    return_aux_outputs=return_aux_outputs,
                     force_no_act=True # force no act during typical batch evaluation for consistent behavior unless explicitly handled
                 )
-                if isinstance(pred, tuple):
-                    pred = pred[0]
+                if return_aux_outputs:
+                    pred, aux_outputs = outputs
+                    pred = fuse_neutral_loss_prediction(
+                        mz_spectrum=pred,
+                        neutral_loss_spectrum=aux_outputs.get("neutral_loss_spectrum"),
+                        molecular_ion_mz=getattr(batch_graph, "molecular_ion_mz", None),
+                        fusion_weight=self.neutral_loss_fusion_weight,
+                    )
+                else:
+                    pred = outputs[0] if isinstance(outputs, tuple) else outputs
             inference_time = time.time() - start_time
             inference_times.append(inference_time / len(graphs))  # Per-sample time
 
