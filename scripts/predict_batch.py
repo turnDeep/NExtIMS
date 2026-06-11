@@ -54,7 +54,10 @@ from tqdm import tqdm
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models.qcgn2oei_minimal import QCGN2oEI_Minimal
+from src.models.qcgn2oei_minimal import (
+    QCGN2oEI_Minimal,
+    fuse_neutral_loss_prediction,
+)
 from src.data.graph_generator_minimal import MinimalGraphGenerator
 from src.data.filters import SUPPORTED_ELEMENTS
 from rdkit import Chem
@@ -121,6 +124,13 @@ class BatchPredictor:
         hidden_dim = pick('hidden_dim', 768)
         num_layers = pick('num_layers', 14)
         num_heads = pick('num_heads', 24)
+        self.use_neutral_loss_head = bool(pick('use_neutral_loss_head', False))
+        self.neutral_loss_fusion_weight = float(
+            pick(
+                'neutral_loss_fusion_weight',
+                0.30 if self.use_neutral_loss_head else 0.0,
+            )
+        )
 
         self.model = QCGN2oEI_Minimal(
             node_dim=node_dim,
@@ -143,14 +153,23 @@ class BatchPredictor:
             pooling_mode=str(pick('pooling_mode', 'mean')),
             graph_feature_dim=int(pick('graph_feature_dim', 0)),
             use_graph_features=bool(pick('use_graph_features', False)),
+            use_neutral_loss_head=self.use_neutral_loss_head,
         )
 
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        missing, unexpected = self.model.load_state_dict(
+            checkpoint['model_state_dict'],
+            strict=False,
+        )
+        if missing:
+            logger.warning(f"Missing keys when loading state_dict: {missing}")
+        if unexpected:
+            logger.warning(f"Unexpected keys when loading state_dict: {unexpected}")
         self.model.to(self.device)
         self.model.eval()
 
         logger.info(f"Model loaded successfully on {self.device}")
         logger.info(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
+        logger.info(f"Neutral-loss fusion weight: {self.neutral_loss_fusion_weight:.2f}")
 
     def validate_smiles(self, smiles: str) -> tuple[bool, str]:
         """
@@ -232,13 +251,24 @@ class BatchPredictor:
 
             start_time = time.time()
             with torch.no_grad():
-                spectrum_pred = self.model(
+                outputs = self.model(
                     x=graph.x,
                     edge_index=graph.edge_index,
                     edge_attr=graph.edge_attr,
                     batch=getattr(graph, "batch", None),
                     graph_features=getattr(graph, "graph_features", None),
+                    return_aux_outputs=self.use_neutral_loss_head,
                 )
+                if self.use_neutral_loss_head:
+                    spectrum_pred, aux_outputs = outputs
+                    spectrum_pred = fuse_neutral_loss_prediction(
+                        mz_spectrum=spectrum_pred,
+                        neutral_loss_spectrum=aux_outputs.get("neutral_loss_spectrum"),
+                        molecular_ion_mz=getattr(graph, "molecular_ion_mz", None),
+                        fusion_weight=self.neutral_loss_fusion_weight,
+                    )
+                else:
+                    spectrum_pred = outputs
             inference_time = time.time() - start_time
 
             spectrum = spectrum_pred.cpu().numpy().squeeze()

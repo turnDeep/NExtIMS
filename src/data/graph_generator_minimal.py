@@ -55,6 +55,7 @@ GRAPH_FEATURE_ELEMENTS = [
 GRAPH_FEATURE_DIM = 2 + len(GRAPH_FEATURE_ELEMENTS)
 MASS_SCALE = 1000.0
 COUNT_SCALE = 100.0
+COMMON_NEUTRAL_LOSSES = (15, 18, 28, 29, 31, 32, 42, 43, 44, 45, 46, 60, 73)
 
 
 class MinimalGraphGenerator:
@@ -94,6 +95,9 @@ class MinimalGraphGenerator:
         use_bde: bool = True,
         use_mass_features: bool = True,
         use_formula_features: bool = True,
+        use_fragment_candidates: bool = False,
+        fragment_output_dim: int = 1000,
+        fragment_mask_window: int = 2,
         bde_min: float = 50.0,
         bde_max: float = 200.0,
         default_bde: float = 85.0
@@ -108,6 +112,9 @@ class MinimalGraphGenerator:
             use_bde: Enable BDE edge feature values
             use_mass_features: Enable exact/molecular mass graph features
             use_formula_features: Enable formula-count graph features
+            use_fragment_candidates: Attach a structure-derived candidate m/z mask
+            fragment_output_dim: Number of m/z bins in the candidate mask
+            fragment_mask_window: +/- m/z bins marked around each candidate
             bde_min: Minimum BDE for normalization (kcal/mol)
             bde_max: Maximum BDE for normalization (kcal/mol)
             default_bde: Default BDE if cache miss and no calculator
@@ -115,6 +122,9 @@ class MinimalGraphGenerator:
         self.use_bde = use_bde
         self.use_mass_features = use_mass_features
         self.use_formula_features = use_formula_features
+        self.use_fragment_candidates = use_fragment_candidates
+        self.fragment_output_dim = int(fragment_output_dim)
+        self.fragment_mask_window = max(int(fragment_mask_window), 0)
         self.bde_min = bde_min
         self.bde_max = bde_max
         self.default_bde = default_bde
@@ -202,6 +212,56 @@ class MinimalGraphGenerator:
                 feature_values[idx] = 0.0
         molecular_ion_mz = max(1, int(round(exact_mass)))
         return np.array(feature_values, dtype=np.float32), exact_mass, molecular_ion_mz
+
+    def get_fragment_candidate_mask(
+        self,
+        mol: Chem.Mol,
+        molecular_ion_mz: int,
+    ) -> np.ndarray:
+        """
+        Build a soft candidate m/z mask from structure only.
+
+        The mask intentionally stays broad: molecular ion, single-bond cleavage
+        fragment masses, and a short list of common EI neutral losses are marked
+        with a small +/- window. It is used only as a weak regularizer.
+        """
+        mask = np.zeros(self.fragment_output_dim, dtype=np.float32)
+
+        def mark_mz(mz_value: float):
+            mz = int(round(float(mz_value)))
+            for candidate_mz in range(
+                mz - self.fragment_mask_window,
+                mz + self.fragment_mask_window + 1,
+            ):
+                if 1 <= candidate_mz <= self.fragment_output_dim:
+                    mask[candidate_mz - 1] = 1.0
+
+        mark_mz(molecular_ion_mz)
+        for neutral_loss in COMMON_NEUTRAL_LOSSES:
+            mark_mz(molecular_ion_mz - neutral_loss)
+
+        for bond in mol.GetBonds():
+            if bond.IsInRing():
+                continue
+            try:
+                fragmented = Chem.FragmentOnBonds(
+                    mol,
+                    [bond.GetIdx()],
+                    addDummies=False,
+                )
+                fragments = Chem.GetMolFrags(
+                    fragmented,
+                    asMols=True,
+                    sanitizeFrags=True,
+                )
+            except Exception:
+                continue
+            for fragment in fragments:
+                try:
+                    mark_mz(rdMolDescriptors.CalcExactMolWt(fragment))
+                except Exception:
+                    continue
+        return mask
 
     def get_bde_for_molecule(self, mol: Chem.Mol, smiles: str) -> Dict[int, float]:
         """
@@ -326,6 +386,15 @@ class MinimalGraphGenerator:
         data.molecular_mass = torch.tensor([exact_mass], dtype=torch.float32)
         data.molecular_ion_mz = torch.tensor([molecular_ion_mz], dtype=torch.long)
         data.molecular_ion_index = torch.tensor([molecular_ion_mz - 1], dtype=torch.long)
+        if self.use_fragment_candidates:
+            fragment_candidate_mask = self.get_fragment_candidate_mask(
+                mol=mol,
+                molecular_ion_mz=molecular_ion_mz,
+            )
+            data.fragment_candidate_mask = torch.tensor(
+                fragment_candidate_mask,
+                dtype=torch.float32,
+            ).unsqueeze(0)
 
         # Add target spectrum
         if spectrum is not None:
