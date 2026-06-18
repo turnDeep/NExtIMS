@@ -6,7 +6,7 @@
     },
     "runArgs": [
         "--gpus=all",
-        "--shm-size=24gb",
+        "--shm-size=32gb",
         "--ipc=host"
     ],
     "customizations": {
