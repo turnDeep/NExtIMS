@@ -1,69 +1,34 @@
 {
-    "name": "BitSpec Mass Spectrum Prediction",
-    "build": {
-        "dockerfile": "Dockerfile",
-        "context": ".."
-    },
-    "runArgs": [
-        "--gpus=all",
-        "--shm-size=24gb",
-        "--ipc=host"
-    ],
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-python.python",
-                "ms-python.vscode-pylance",
-                "ms-toolsai.jupyter",
-                "ms-azuretools.vscode-docker",
-                "eamodio.gitlens",
-                "gruntfuggly.todo-tree"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/bin/python3",
-                "python.linting.enabled": true,
-                "python.linting.pylintEnabled": false,
-                "python.linting.flake8Enabled": true,
-                "python.formatting.provider": "black",
-                "editor.formatOnSave": true,
-                "editor.rulers": [88],
-                "files.exclude": {
-                    "**/__pycache__": true,
-                    "**/*.pyc": true,
-                    "**/.pytest_cache": true,
-                    "data/mol_files": true
-                },
-                "files.watcherExclude": {
-                    "**/__pycache__": true,
-                    "**/.pytest_cache": true,
-                    "data/mol_files/**": true,
-                    "**/*.mol": true,
-                    "**/*.sdf": true,
-                    "**/*.msp": true
-                },
-                "search.exclude": {
-                    "**/__pycache__": true,
-                    "**/.pytest_cache": true,
-                    "data/mol_files/**": true,
-                    "**/*.mol": true,
-                    "**/*.sdf": true
-                }
-            }
+  "name": "NExtIMS 1.1 (no BDE)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "runArgs": [
+    "--gpus=all",
+    "--shm-size=1gb"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "devuser",
+  "postCreateCommand": "python -m pip install --no-deps -e .",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "files.watcherExclude": {
+          "**/data/**": true,
+          "**/paper_runs/**": true
+        },
+        "search.exclude": {
+          "**/data/**": true,
+          "**/paper_runs/**": true
         }
-    },
-    "mounts": [
-        "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind",
-        "source=${localWorkspaceFolder}/checkpoints,target=/workspace/checkpoints,type=bind"
-    ],
-    "workspaceFolder": "/workspace",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
-    "postCreateCommand": "pip install -e .",
-    "remoteUser": "devuser",
-    "features": {
-        "ghcr.io/devcontainers/features/git:1": {},
-        "ghcr.io/devcontainers/features/common-utils:2": {
-            "installZsh": false,
-            "installOhMyZsh": false
-        }
+      }
     }
+  }
 }

@@ -50,7 +50,7 @@ class NISTGraphDataset(Dataset):
         bde_cache_path: Optional[str] = None,
         bondnet_model: Optional[str] = None,
         mol_files_dir: str = "data/mol_files",
-        use_bde: bool = True,
+        use_bde: bool = False,
         use_mass_features: bool = True,
         use_formula_features: bool = True,
         use_fragment_candidates: bool = False,
@@ -1028,6 +1028,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-bde",
         action="store_true",
+        default=True,
         help="Disable BDE edge feature values",
     )
     parser.add_argument(

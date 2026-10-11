@@ -1,0 +1,286 @@
+{
+  "as_of": "2026-10-11",
+  "scope": "Aggregate saved results, not a new accuracy rerun",
+  "private_compound_data_exported": false,
+  "records": [
+    {
+      "version": "EXP-V008",
+      "source": "version_comparison_20261002/evaluation/comparison_all.csv",
+      "output": "EXP-V008/comparison_all.csv",
+      "source_sha256": "23105c7188133da5888c6213e2cbd37e4155f31e657883b9f14ba9fcee79e815",
+      "rows": 52,
+      "exported_sha256": "8d6b2b69668494a196f1d3fe01a023f6a5a662ddff828685491a964d987ee2b5"
+    },
+    {
+      "version": "EXP-V009",
+      "source": "v004_v007_update4000_20261003_r02/evaluation/comparison.csv",
+      "output": "EXP-V009/comparison.csv",
+      "source_sha256": "1f23490ebf6d708daaf124f5e95f3b006a83b6e5f02347651a32fe0ecda21c75",
+      "rows": 4,
+      "exported_sha256": "ecdeb72e0d3c4c12928c7d82fb4883c80e0996a6adc03c992e2962988a9203c6"
+    },
+    {
+      "version": "EXP-V010",
+      "source": "fresh_updates_accuracy_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V010/condition_means.csv",
+      "source_sha256": "140e8c62c34e8b5d91fa1a3057f250133d720e40d0aec1a563bbfe8bc9c64f17",
+      "rows": 10,
+      "exported_sha256": "c4b37fc7e0206e93d25f8f7b70506d58d88bfd65ea82b5497c7d6dce2537bf71"
+    },
+    {
+      "version": "EXP-V011",
+      "source": "act_factorial_20261006/evaluation/additional_condition_means.csv",
+      "output": "EXP-V011/additional_condition_means.csv",
+      "source_sha256": "7bca8f49cbf8d8098ad53531fe2ade199085bd8d37be5de9e69f3c47c26c6f30",
+      "rows": 44,
+      "exported_sha256": "c7934feffa9324e43b9c47f671fccbe9bfbe554d0f81b1faf55233182ea4952d"
+    },
+    {
+      "version": "EXP-V011",
+      "source": "act_factorial_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V011/condition_means.csv",
+      "source_sha256": "0895352c56b26a64e423ec28fd38a20e37fe8b258616b0345f18f3555ea25c73",
+      "rows": 132,
+      "exported_sha256": "4a5ed8039ba6ad99beb4d64dd02094965a8457f4a68ba64d7d369292a6a6b2f3"
+    },
+    {
+      "version": "EXP-V011",
+      "source": "act_factorial_20261006/evaluation/gap_means.csv",
+      "output": "EXP-V011/gap_means.csv",
+      "source_sha256": "b408e8bea7ad7e5a514cb11decefb64759a02cab05e3e5bddb77413678700f5c",
+      "rows": 11,
+      "exported_sha256": "af7d1fa21ae1d91063d2de796ff8163cb08f2f2342042cbe5379655c6ce3cde0"
+    },
+    {
+      "version": "EXP-V012",
+      "source": "chemical_ion_branches_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V012/condition_means.csv",
+      "source_sha256": "a2313da9925f9f96d669f4ec3298d9cfd36530e5df9fdecc9d4b62a5a0f60f3c",
+      "rows": 20,
+      "exported_sha256": "7e96c9c767e0aa2ba8277b1df0bc71d6b002c80b53ff62a7f189a43d3710bae2"
+    },
+    {
+      "version": "EXP-V012",
+      "source": "chemical_ion_branches_20261006/evaluation/gap_means.csv",
+      "output": "EXP-V012/gap_means.csv",
+      "source_sha256": "3f63d2d1a5237480ba6e16a9ae3a0c735567462720630c51e773af1194fc4532",
+      "rows": 5,
+      "exported_sha256": "6c05f7cb366e7c7e6afa1c96b4ac188c21a04d476cb9f06ae8718ca309839bb5"
+    },
+    {
+      "version": "EXP-V013",
+      "source": "residual_charge_factorial_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V013/condition_means.csv",
+      "source_sha256": "37bc7d21ee9db80d469f291c6d19056a2eac9db6123aeb0a8abe44e3a4d5ee5e",
+      "rows": 16,
+      "exported_sha256": "c9e89adcd44be0b633340536f4ed43b6c11826bc2db6b981482119a3ca461a35"
+    },
+    {
+      "version": "EXP-V013",
+      "source": "residual_charge_factorial_20261006/evaluation/gap_means.csv",
+      "output": "EXP-V013/gap_means.csv",
+      "source_sha256": "df1f9b479d6f910d23a1efe32c2c2425035f5875cd6b569f5445edec9581b9fc",
+      "rows": 16,
+      "exported_sha256": "f1d627a748bc2373ea2c3b3475168487df777f3225d89febce5987de0960c93b"
+    },
+    {
+      "version": "EXP-V014",
+      "source": "v013_regularization_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V014/condition_means.csv",
+      "source_sha256": "30cf01a65d4f7b7c35ea54d6b4b24592b4d4f0b8040265eddd7fbfb9b4498e77",
+      "rows": 25,
+      "exported_sha256": "2894e021999d1b01d9f7717965a9c35ae02971ca09bea3bb55338feb499e86f5"
+    },
+    {
+      "version": "EXP-V014",
+      "source": "v013_regularization_20261006/evaluation/gap_means.csv",
+      "output": "EXP-V014/gap_means.csv",
+      "source_sha256": "f602cb257f61169f84b4230760bac4866928edd48010610fe6844d2d176ad093",
+      "rows": 20,
+      "exported_sha256": "2a30bbd8f1b8233ca148f0daba64f740a41f4136e8bb594b0a4574cd182bd61b"
+    },
+    {
+      "version": "EXP-V015",
+      "source": "fragment_generalization_20261006/evaluation/comparison_with_previous.csv",
+      "output": "EXP-V015/comparison_with_previous.csv",
+      "source_sha256": "8eb0c0a2f33b2d3e9f31281a6ba9119719cadff3c6453f67b244ed80d7aeb2ad",
+      "rows": 14,
+      "exported_sha256": "4862e57f975b74975315c4f1fb7389b1d77a56a266d2397054e3c4a952bbf509"
+    },
+    {
+      "version": "EXP-V015",
+      "source": "fragment_generalization_20261006/evaluation/condition_means.csv",
+      "output": "EXP-V015/condition_means.csv",
+      "source_sha256": "aeec2d7fc564cf8e400f4b764def3b63dcea3ebbdfc4b71c878ef3a310b42f09",
+      "rows": 70,
+      "exported_sha256": "790a78d5bb2a4fbf6b36acd3d5b587cd4a0b29ca11b0f467eb32f6005f3aa3ca"
+    },
+    {
+      "version": "EXP-V015",
+      "source": "fragment_generalization_20261006/evaluation/gap_means.csv",
+      "output": "EXP-V015/gap_means.csv",
+      "source_sha256": "c6463b19aab5a041a8923c591fb6ebb3ad2dc9bd9fed24c2db3b1c6ad52205e2",
+      "rows": 56,
+      "exported_sha256": "52d3b307213dba0dbb6adbcc54009506d0dcbf3fc3b31ef42b01501d4be0a36d"
+    },
+    {
+      "version": "EXP-V016",
+      "source": "batch_accumulation_20261007_r03/evaluation/comparison.csv",
+      "output": "EXP-V016/comparison.csv",
+      "source_sha256": "d75a215bb365e1ebb5f55dbbdcc29b9590fe2bff3a3b8b3cac87ac6143406687",
+      "rows": 10,
+      "exported_sha256": "def1d125aa5b371553ec71c86f4eb2cd81591444c6ff6a4faeb7757c6afda821"
+    },
+    {
+      "version": "EXP-V018",
+      "source": "v018_generalization_20261010_r02/comparison.csv",
+      "output": "EXP-V018/comparison.csv",
+      "source_sha256": "49931fd68cf89040aca32d5f22fda2cd47bb8515fdfef4a057623887b4464c73",
+      "rows": 4,
+      "exported_sha256": "678c66cedcf9aa56b0203b66e9f3d65b66d6bdedeacd4ec15f4842ec51185148"
+    },
+    {
+      "version": "EXP-V019",
+      "source": "v019_single_model_generalization_20261010/comparison.csv",
+      "output": "EXP-V019/comparison.csv",
+      "source_sha256": "7f7e6bdaa03d28cc2913b74c603aa94e1884fe9b5b7b659b756b5400bceadcd9",
+      "rows": 6,
+      "exported_sha256": "335bb29f4ed50b389150444c527a108f699d222012a862e151a801396de3043e"
+    },
+    {
+      "version": "EXP-V020",
+      "source": "v020_component_ablation_20261010/comparison.csv",
+      "output": "EXP-V020/comparison.csv",
+      "source_sha256": "c10d2a56a52476eae9c60614ea81bfcbbd78a5a40467ab72be4fad63a6ad9e8e",
+      "rows": 9,
+      "exported_sha256": "70f628351f5de3ee1f01a0865bea3a47cefcb403d8485038bed9375df20d407b"
+    },
+    {
+      "version": "EXP-V021",
+      "source": "v021_feedback_off_act_fixed_20261011/comparison.csv",
+      "output": "EXP-V021/comparison.csv",
+      "source_sha256": "35d8ebc64c291a1af826b2e2baff158e1a027d00f24c5c629590ba03af5c4a0b",
+      "rows": 3,
+      "exported_sha256": "13a02786e2e8c619b80b4caa7cdde97b0c0422147a6ae631563bbb18f176d6a1"
+    },
+    {
+      "version": "EXP-V021",
+      "source": "v021_feedback_off_act_fixed_20261011/comparison_val.csv",
+      "output": "EXP-V021/comparison_val.csv",
+      "source_sha256": "c34bd348e5a8ec2724a0583cd014d1a94d162dfb4185e3f8759c51d3683e486d",
+      "rows": 3,
+      "exported_sha256": "f4717bb42dc2e8108f44c2f937e4572b9cf19f31e7aaa68683cddb432bf65e22"
+    },
+    {
+      "version": "HIST-BDE",
+      "source": "bde-real-20260611/edge_compare_summary.csv",
+      "output": "HIST-BDE/edge_compare_summary.csv",
+      "source_sha256": "e762d174c2d740f72859eb6ed3ebbb21774e76568af6eadf0e21378a21815c2b",
+      "rows": 4,
+      "exported_sha256": "536cd08d2ceed1d20d6164739a39e8b220a6aa1288620438e2b85ad9c26967e6"
+    },
+    {
+      "version": "HIST-BDE",
+      "source": "bde-real-20260611/full_edge_occlusion_results.csv",
+      "output": "HIST-BDE/full_edge_occlusion_results.csv",
+      "source_sha256": "52209f71a5e8e5f7b41b18a3f4884faf7d533d4219e873a1340a5119215be15e",
+      "rows": 53,
+      "exported_sha256": "3a3dd948e5ab982f049065a3d642d9510bdade6b8260838808b45d8b7a84e599"
+    },
+    {
+      "version": "HIST-FEATURE",
+      "source": "feature-ablation-20260611/feature_ablation_results.csv",
+      "output": "HIST-FEATURE/feature_ablation_results.csv",
+      "source_sha256": "e42e2448a5ad45aeacc32d7cfe784783661c67afbf05060e8b77b69e09a789f3",
+      "rows": 8,
+      "exported_sha256": "047cc70d29e2c22bf0ed16f99c559dd19c0c1d51e7d26cbfa255e20b00ba0b78"
+    },
+    {
+      "version": "HIST-FUSION50K",
+      "source": "neutral-fusion-random50k-20260620/fusion_train_eval_best_summary.csv",
+      "output": "HIST-FUSION50K/fusion_train_eval_best_summary.csv",
+      "source_sha256": "443f676a7d8e105b85aa85116c8dd35efd36049b1dc7da8e92cb429d0071764e",
+      "rows": 20,
+      "exported_sha256": "82ba355dea002f9fd8671889d1760257ff406c3908acfd26250f34f3115508ff"
+    },
+    {
+      "version": "HIST-FUSION50K",
+      "source": "neutral-fusion-random50k-20260620/fusion_train_same_eval_summary.csv",
+      "output": "HIST-FUSION50K/fusion_train_same_eval_summary.csv",
+      "source_sha256": "f0d8bb7cf15dd491f025b1ee18b632b51e4161fb2803806aa90360fb7bc99840",
+      "rows": 5,
+      "exported_sha256": "c25d5d6b4b9e73dc8a6536fd0916da140bd2f1f1c61f27f3a7d2ee126807fc3b"
+    },
+    {
+      "version": "HIST-GATE50K",
+      "source": "neutral-fusion-gate-random50k-20260620/fixed_vs_bounded_variable_comparison.csv",
+      "output": "HIST-GATE50K/fixed_vs_bounded_variable_comparison.csv",
+      "source_sha256": "ace82181ddae816a237e7e7875930dbd2009dc0600dddc87eab1d99f348b489b",
+      "rows": 2,
+      "exported_sha256": "81fe6cc998b55d6153808ab02a383d6566c66058afee8553d02ad60c6ce12ead"
+    },
+    {
+      "version": "HIST-MOTIF",
+      "source": "consensus-motif-50k-20260620/all_50k_comparison_summary.csv",
+      "output": "HIST-MOTIF/all_50k_comparison_summary.csv",
+      "source_sha256": "32c01e68d842a0f51d7c14499454beee5bf36ffc31476017ff73387f88d22c11",
+      "rows": 3,
+      "exported_sha256": "5fb5192f94fad66e29a9cfcb6cda791818a32a361fb7ac9aa8762bd4a7150d13"
+    },
+    {
+      "version": "HIST-MOTIF",
+      "source": "consensus-motif-50k-20260620/motif_comparison_summary.csv",
+      "output": "HIST-MOTIF/motif_comparison_summary.csv",
+      "source_sha256": "6049b49fd3356cd3c781232d03b4d43e5eaa92aa492cd9b3845b0454835500ea",
+      "rows": 2,
+      "exported_sha256": "86d9852085e8d1e142d932b11256e3564e550791d76508c5d47f2abe4fa27f28"
+    },
+    {
+      "version": "HIST-DOCKER10",
+      "source": "docker-recheck-20260627/docker_recheck_10ideas_summary.csv",
+      "output": "HIST-DOCKER10/docker_recheck_10ideas_summary.csv",
+      "source_sha256": "710dd3159e9105a5532516671fd7db4f6fcc10e742c47d8031e633fde65af30f",
+      "rows": 10,
+      "exported_sha256": "6d4c3bf51471c197ec63741816b207df48d80c5175e83824159269ddf9a650d2"
+    },
+    {
+      "version": "HIST-HSHIFT",
+      "source": "hydrogen-shift-docker-20260628/hydrogen_shift_proxy_summary.csv",
+      "output": "HIST-HSHIFT/hydrogen_shift_proxy_summary.csv",
+      "source_sha256": "71132cdcabbaab1f407fe5e762293cfcb37ddda91622e4da04908254f69ef10a",
+      "rows": 4,
+      "exported_sha256": "71132cdcabbaab1f407fe5e762293cfcb37ddda91622e4da04908254f69ef10a"
+    },
+    {
+      "version": "HIST-CASCADE",
+      "source": "fragment-cascade-docker-20260628/fragment_cascade_proxy_summary.csv",
+      "output": "HIST-CASCADE/fragment_cascade_proxy_summary.csv",
+      "source_sha256": "3f5f460dee1b068595ed0800e787442ad3fc22d19ae8cf607cc51807ba3d7dc8",
+      "rows": 15,
+      "exported_sha256": "322d35b6d47c446dbb8714fddf59689eec22dbf62bed60385a29413bd659b615"
+    },
+    {
+      "version": "EXP-V001",
+      "source": "RTX5090/experiments/test_evaluation_summary.csv",
+      "output": "EXP-V001/test_evaluation_summary.csv",
+      "source_sha256": "1a7fad08d6c7403c18a563e3d7ad15c7c7e6b4d0254e2916271251b96969e4cc",
+      "rows": 13,
+      "exported_sha256": "66710f204689e2fe5e3014a2ffa9ab808f4560b2d01453b831465a60a7c8edc9"
+    },
+    {
+      "version": "HIST-BDE",
+      "source": "bde-real-20260611/bde_real_verification_summary.md",
+      "output": "HIST-BDE/bde_real_summary.md",
+      "source_sha256": "e6a24848c38cdc06ceda8a10542973cd1dbe88257a5fc93b858a60b8c780c9c1",
+      "exported_sha256": "1083b837a647f414f2eb91ad258fc2f60ac2825fc79171fba605e3a1d52c1e1c"
+    },
+    {
+      "version": "HIST-FEATURE",
+      "source": "node-feature-groups-20260611/node_feature_group_verification_summary.md",
+      "output": "HIST-FEATURE/node_feature_group_summary.md",
+      "source_sha256": "32db828c1f21ec265e968622bc92a7329dbe38f4b6e2b53e7d57ff0e1651f69c",
+      "exported_sha256": "601f9d0b5e37560e0b48be29406232bdb178039f88b8d1c5cd66d9215b560907"
+    }
+  ],
+  "missing": []
+}

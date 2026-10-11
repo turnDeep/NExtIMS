@@ -1,274 +1,195 @@
-# NExtIMS v1.0 - Neural EI-MS Prediction System
+# NExtIMS
 
-次世代の電子衝撃イオン化マススペクトル（EI-MS）予測システム。QC-GN2oMS2の実証済みアプローチに基づく強力なGNNアーキテクチャを採用し、立体化学（Stereochemistry）と結合解離エネルギー（BDE）を統合した高精度な予測を実現します。
+化学構造から電子イオン化（EI）マススペクトルを予測する研究用GNNです。化合物の構造をSMILESまたはMOLから読み込み、m/z 1–1000の相対強度を予測します。スペクトルから構造を直接生成するモデルではありません。
 
-**設計哲学**: "Precision through Chemistry-Aware Deep Learning"
+**現在のソフトウェア版はv1.1.0。研究構成はEXP-V021を踏まえたEXP-V022です。** 2026-10-11時点で大規模なEXP-V022の学習は進行中です。下記の小規模結果をそのまま本番サイズの性能とみなさないでください。学習済み重み・NISTのライセンス対象データは配布していません。
 
-## ✨ 特徴
+## 現在の構成
 
-### コア機能
+| 項目 | 設定 |
+|---|---|
+| 分子エンコーダ | エッジ特徴量を用いるGATv2系GNN、hidden 768・14層・24 heads |
+| 特徴量 | ノード34次元・エッジ10次元・分子量/元素数17次元 |
+| Pooling | mean + add + maxを連結。平均的環境・量的情報・強い局所信号を保持 |
+| 出力 | 独立したm/z headとneutral-loss headをm/z軸へ戻して7:3で融合 |
+| 反復 | 共有refinement block、ACT（Adaptive Computation Time）上限4段 |
+| 残差補正 | 前段のスペクトルを基準に、制限された補正を加える |
+| スペクトルfeedback | 入力への戻し込み・停止診断への使用ともOFF |
+| 学習 | 最終Cosine + neutral-loss補助loss 0.05 + 各段Cosine 0.05/Top-k順位loss 0.02 + ACT ponder 0.001 |
+| Optimizer | RAdam、lr 0.00005、SAM rho 0.02、weight decay 0、gradient clip 1 |
+| 数値計算 | FP32、TF32 OFF。AMPは本構成では使用しない |
+| データ/メモリ | SQLite遅延読込、workers=0、CPUグラフキャッシュ上限64 MiB、空きRAM保護 |
+| 学習停止 | 最大200 epoch、最低20 epoch、4指標すべてが10 epoch停滞したら停止 |
+| 採用重み | 完全なValidation全体のCosineが最大になったepoch |
 
-- **GNN Architecture**: GATv2Conv (デフォルト: 14層, 768 hidden dimension, 24 heads - RTX 5070 Ti最適化)
-- **OpenMythos ACT Recurrent Refinement**: グラフプーリング後の表現を、適応的計算時間（ACT: Adaptive Computation Time）、LTI風安定化、ループ埋め込みを用いて再帰的に細分化・改良する機能。
-- **Graph-level Chemistry Features**: mean/add/max poolingに加え、分子量・精密質量・元素組成カウントをグラフ全体の特徴量として統合。
-- **Neutral-loss Head + Fusion**: 通常のm/z直接予測に加え、分子イオンからのneutral lossを予測し、`molecular ion m/z - neutral loss` でm/zスペクトルへ戻して融合する標準出力方式。
-- **Node Features**: 34次元（原子種、ハイブリダイゼーション、芳香族性、電荷、ラジカル、**立体化学/Chirality**）
-- **Edge Features**: 10次元（結合次数、**BDE**、共役系、**結合立体化学/Stereo**）
-- **Loss Function**: Cosine similarity loss + neutral-loss auxiliary loss + ACT Ponder Loss (推論時間調整用) + 中間スペクトル補助損失 (任意)
-- **Optimizer**: RAdam
-- **評価メトリクス**: Cosine Similarity, Top-K Recall, MSE/RMSE, Spectral Angle
-- **RTX 50シリーズ対応**: RTX 5070 Ti (16GB) 最適化アーキテクチャ。RTX 5090ではモデルを巨大化するより、batch sizeを増やして学習速度と勾配安定性を高めることを推奨。
+BDE、追加のcarbon/electronic/ringノード特徴量、molecular-ion auxiliary lossは現行標準では使用しません。BDEを入れていたエッジ列は重みの互換性のため定数0.5として残り、BDEの情報は含みません。BonDNet、DGL、Claudeの実行コード・環境依存は削除しました。過去の検討は下記の履歴に残しています。
 
-## 🎯 性能目標
+ACTの段数は1分子の1回の予測内の反復回数です。epochは全学習データを通る回数、`updates-per-batch`は同じバッチでパラメータを更新する回数です。3つは別物です。各段教師が正解を参照するのは学習時だけで、未知分子の推論に正解スペクトルは必要ありません。
 
-| メトリック | 目標値 | 判定基準 |
-|-----------|--------|---------|
-| **Cosine Similarity** | ≥ 0.85 | EXCELLENT |
-| **Top-10 Recall** | ≥ 0.95 | EXCELLENT |
+## インストール
 
-## 📋 システム要件
-
-### 推論環境（最小要件）
-- **CPU**: 4コア以上
-- **RAM**: 8GB以上
-- **GPU**: オプション（CPU推論可能）
-- **ストレージ**: 1GB以上
-
-### 学習環境（推奨構成）
-- **CPU**: AMD Ryzen 7700 (8コア/16スレッド) 以上
-- **GPU**: NVIDIA RTX 5070 Ti (16GB VRAM) 以上
-- **RAM**: 32GB DDR5
-- **ストレージ**: 1TB NVMe SSD
-- **OS**: Ubuntu 22.04+ / Windows 11 with WSL2
-- **CUDA**: 12.8+
-- **PyTorch**: 2.7.0+
-- **Python**: 3.10+
-
-## 🚀 クイックスタート
-
-### インストール
+Python 3.10以上。基準環境はPython 3.11 / PyTorch 2.9.1 / PyG 2.6.1 / RDKit 2026.03.6です。CPUでも予測でき、専用VRAMは必須ではありません。768/14/24のCPU学習は長時間かかります。
 
 ```bash
-# 1. リポジトリのクローン
 git clone https://github.com/turnDeep/NExtIMS.git
 cd NExtIMS
-
-# 2. 依存関係のインストール
-pip install -r requirements.txt
-pip install -e .  # パッケージとしてインストール
-
-# 2a. Git LFS（BDE-db2使用時のみ必要）
-# Ubuntu/Debian
-sudo apt-get install git-lfs
-git lfs install
-
-# 2b. DGL & BonDNet（BDE計算に必要）
-# CUDA版DGL
-pip install dgl -f https://data.dgl.ai/wheels/torch-2.5/cu128/repo.html
-# BonDNet
-pip install git+https://github.com/mjwen/bondnet.git
-
-# 3. データのダウンロード（NIST17）
-# NIST EI-MSスペクトルデータベースを配置
-# - NIST17.MSP: マススペクトルデータ（ピーク情報）を data/ に配置
-# - mol_files/: 化学構造データ（MOLファイル）を data/mol_files/ に配置
-# - ID番号でリンク: MSP内のIDとMOLファイル名（ID12345.MOL）が対応
-
-# 4. BonDNet BDEモデル準備（Phase 0）
-
-# Option A: 公式Pre-trained modelを使用（推奨・高速）
-# BonDNet公式の学習済みモデル (bdncm/20200808) を自動ダウンロード
-python scripts/download_bondnet_pretrained.py --output models/bondnet_pretrained.pth
-
-# Option B: BDE-db2で再学習（より高カバレッジ）
-# 手順省略（scripts/train_bondnet_bde_db2.py を使用）
+python -m venv .venv
+# Linux: source .venv/bin/activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu128
+python -m pip install -e .
 ```
 
-### トレーニング
+RTX5090は`cu128`、GTX1650 Tiは`cu126`、CPU専用は`cpu`を上記URL末尾に指定します。これは基準版の指定であり、最新Nightlyが必須という意味ではありません。[PyTorch公式の対応wheel](https://pytorch.org/get-started/previous-versions/)。PyG追加拡張のソースビルドは必須ではありません。[PyG公式の基本インストール](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)。
+
+Docker/VSCode Dev Containerは[環境手順](.devcontainer/README.md)を参照してください。
+
+## データ配置
+
+次の両方に対応します。MOLの名前は`ID1.MOL`などのIDまたは数値名で、MSPのIDと対応させます。MSPに有効なSMILESがあればMOLは不要です。
+
+```text
+data/
+  NIST17.MSP
+  NIST17.MOL/        # 単一ファイルではなく、多数のMOLファイルが入ったフォルダ
+    ID1.MOL
+    ID2.MOL
+```
+
+```text
+data/
+  1-50000/NIST17.MSP
+  1-50000/NIST17.MOL/ID1.MOL
+  50001-100000/NIST17.MSP
+  50001-100000/NIST17.MOL/ID50001.MOL
+  ...
+```
+
+無効構造・未対応元素・不正なスペクトルは事前に除外し、`rejected_entries.csv`へ理由を記録します。標準は**有効レコード全量**です。同一canonical isomeric SMILESのreplicateを同じsplitにまとめ、Train/Validation/Testを概ね80/10/10へ分けます。構造グループ単位なので件数は厳密な80/10/10にはなりません。これはscaffold splitではなく、立体異性体の骨格類似性まで排除する保証もありません。
+
+## 学習・評価・予測
+
+リポジトリ直下で実行します。`nextims`コマンドの代わりに`python scripts/nextims.py`でも同じように実行できます。
 
 ```bash
-# ACT Recurrent Refinement機能を利用したGNN学習
-# 初回はACTの早期終了を抑制するため、--act-loss-weight を 0.001 から始めることを推奨します
-python scripts/train_gnn_minimal.py \
-    --nist-msp data/NIST17.MSP \
-    --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
-    --output models/qcgn2oei_stable_act_refine.pth \
-    --epochs 200 \
-    --batch-size 32 \
-    --hidden-dim 768 \
-    --num-layers 14 \
-    --num-heads 24 \
-    --pooling-mode mean_add_max \
-    --use-recurrent-refinement \
-    --refinement-steps 4 \
-    --refinement-max-steps 8 \
-    --use-lti-stabilization \
-    --use-loop-embedding \
-    --use-act \
-    --act-loss-weight 0.001 \
-    --use-neutral-loss-head \
-    --neutral-loss-weight 0.05 \
-    --neutral-loss-fusion-weight 0.30
+# 現行標準を全量学習。安全側の物理batchは16。
+nextims --mode train --data-dir data --device cuda --batch-size 16 --output paper_runs/current
+
+# RTX5090でまず容量を確認（学習重みは破棄される）
+nextims --full-mode capacity --device cuda --batch-size 256 --output paper_runs/capacity256
+
+# 容量確認後の本学習。実測VRAMに余裕を残すこと。
+nextims --device cuda --batch-size 256 --output paper_runs/current5090
+
+# 同じ設定・同じソースで、保存済みepochから再開
+nextims --device cuda --batch-size 256 --output paper_runs/current5090 --resume
+
+# 学習後の選択済みモデルでTestを集計
+nextims --mode evaluate --device cpu --checkpoint paper_runs/current5090/best_model.pth --prepared-db paper_runs/current5090/preparation/dataset.sqlite --output paper_runs/reevaluation
+
+# 未知構造を予測。CPUで実行可。
+nextims --mode predict --device cpu --checkpoint paper_runs/current5090/best_model.pth --predict-smiles CCO --prediction-output prediction.csv
+
+# name,smiles列を含むCSVを予測ライブラリへ変換
+nextims --mode predict --device cpu --checkpoint paper_runs/current5090/best_model.pth --input-csv candidates.csv --prediction-output predicted_library.msp
 ```
 
-> `train_gnn_minimal.py` では neutral-loss head は標準ON、`--neutral-loss-fusion-weight` のデフォルトは `0.30` です。明示的に無効化する場合のみ `--no-neutral-loss-head` を指定してください。
+現行SAM runnerでは`--grad-accumulation 1`に固定します。標準の`--updates-per-batch 4`は同じバッチを4回更新し、各更新でSAMの2回のforward/backwardを実施します。4回の反復推論でも、実効batchを4倍にする勾配蓄積でもありません。`--batch-size 1024`が全分子で安全に動く保証はないため、256等から容量確認してください。
 
-> [!TIP]
-> **段階的な機能検証**
-> 1. ベースライン（Refinementなし）
-> 2. ACTなし固定ループ（`--use-recurrent-refinement --refinement-steps 4 --refinement-max-steps 8 --use-lti-stabilization --use-loop-embedding`）
-> 3. ACTあり（上記＋`--use-act --act-loss-weight 0.001`）
-> 4. 標準構成（ACTあり＋neutral-loss fusion `--neutral-loss-fusion-weight 0.30`）
-> の順に学習を行い、各機能の寄与を確認することを推奨します。
+`best_model.pth`、`history.csv`、`status.json`、`EXPERIMENT.json`、`data_audit.json`、最終`evaluation_summary.csv`と`REPORT.md`を出力します。各splitの分子別・段別評価も`evaluation/`に出ます。CPUグラフキャッシュは有界ですが、モデル/optimizer/チェックポイントにもRAMとディスクが必要です。途中のオンラインTrainはDropout ONなので、Train–Val差はDropout OFFの固定診断または最終全Train評価で判断します。
 
-### 評価
+新CLIはEXP-V020/021/022系列のresearch checkpointを読みます。v1.0の旧重みは`scripts/predict_gnn_minimal.py`等の旧CLIを使用してください。実BDE入力を必要とする旧重みは、対応する過去のGit revisionと環境で実行してください。重みの新旧を自動的に混ぜません。モデルを第三者から入手した場合、`torch.load`は信頼したファイルに限定してください。
+
+## 大規模検証結果
+
+RTX5090から移行したEXP-V001の保存済み評価CSVです。768/14/24、seed 42、最大200 epoch、batch256、Test 30,294件。同じ表の条件間で比較します。重みはこのPCへ移行されていないため、再推論の結果ではありません。[全数値](docs/research/evidence/EXP-V001/test_evaluation_summary.csv)。
+
+| 構成 | Test Cosine | Top5 | Top10 | Top20 |
+|---|---:|---:|---:|---:|
+| 直接m/z予測 | 0.755154 | 0.554572 | 0.561468 | 0.574983 |
+| 固定反復・NLなし | 0.754549 | 0.556176 | 0.566914 | 0.582658 |
+| ACT・NLなし | 0.756503 | 0.557635 | 0.568456 | 0.582226 |
+| ACT + NL補助lossのみ | 0.756693 | 0.556896 | 0.568888 | 0.581546 |
+| ACT + fusion 0.10 | 0.825528 | 0.626784 | 0.620803 | 0.620227 |
+| ACT + fusion 0.20 | 0.833369 | 0.634112 | 0.628778 | 0.627799 |
+| ACT + fusion 0.30 | **0.834204** | **0.637948** | **0.630884** | **0.629128** |
+| ACT + fusion 0.40 | 0.833565 | 0.635981 | 0.629656 | 0.626041 |
+| ACT + fusion 0.50 | 0.833795 | 0.635552 | 0.628121 | 0.623671 |
+
+このfusion探索群では0.30が4指標で最大でした。直接予測からCosineは+0.079051で、ACT単独の+0.001350より大きい改善です。補助lossだけではNL側の出力が最終予測に直接反映されません。融合は、分子イオンからの質量差で学習した予測をm/zへ戻し、絶対m/zの予測を補完するため有効だったと考えられます。ただし、これは化学反応経路を実証した結果ではなく、0.30は化学法則や脱離確率ではありません。Testを含む過去の開発比較なので、全く未使用の外部検証と同一視できません。
+
+## 小規模検証結果
+
+EXP-V020: hidden96/3層/4 heads、Train3,200・Validation400・内部Test800、seed42/43平均、80 epoch・各8,000更新。各行は同じ小規模条件です。SAMありは16,000 forward/backward、なしは8,000なので、計算量まで同じではありません。[全数値](docs/research/evidence/EXP-V020/comparison.csv)。
+
+| 条件 | Val Cosine | Val Top5 | Val Top10 | Val Top20 | Test Cosine | 固定Train–Val差 |
+|---|---:|---:|---:|---:|---:|---:|
+| ACT4 + residual + feedback + 各段教師 + SAM | 0.486249 | 0.298500 | 0.346125 | 0.389875 | 0.481622 | 0.136067 |
+| SAMなし | 0.473542 | 0.286500 | 0.336125 | 0.381000 | 0.467883 | 0.186450 |
+| 残差補正なし | 0.457977 | 0.279500 | 0.331250 | 0.382063 | 0.460296 | 0.125582 |
+| 各段教師なし | 0.478462 | 0.291000 | 0.340250 | 0.384188 | 0.470822 | 0.138549 |
+| feedback全OFF | **0.512325** | **0.320250** | **0.359875** | **0.410938** | **0.510410** | 0.050609 |
+| fusionのみ・反復なし + SAM | 0.501785 | 0.311500 | 0.358375 | 0.405688 | 0.499526 | **0.035735** |
+
+feedback除外は精度を上げながら差を縮めました。ただし差が最小なのは反復なしであり、差の縮小だけを性能としません。残差補正と各段教師は除くと低下する傾向、SAMはVal精度と差の両方で有望でした。追加feedbackが過学習経路を増やすという説明は仮説で、分子内機構を直接計測したものではありません。
+
+EXP-V021ではfeedback OFFのままACT対固定4段を直接比較しました。Train/Valは同じ、Testは別の内部800件です。V020のTestと混ぜません。[全数値](docs/research/evidence/EXP-V021/comparison.csv)。
+
+| 条件 | Val Cosine | 新Test Cosine | 新Test Top5 | Top10 | Top20 | 固定Train–Val差 |
+|---|---:|---:|---:|---:|---:|---:|
+| ACT上限4段 | 0.512325 | **0.510893** | 0.318250 | 0.348813 | 0.401844 | 0.050609 |
+| 固定4段 | 0.511569 | 0.508123 | 0.318125 | 0.347500 | 0.401375 | 0.047957 |
+| fusionのみ + SAM | 0.501785 | 0.498758 | 0.312750 | 0.339875 | 0.390094 | 0.035735 |
+
+ACTはCosineに小さな上積みがありましたが、Top-k差のbootstrap区間は0をまたぎ、すべてが確実に改善したとは言えません。ACTの実停止深度は平均3.981段で、ほぼ4段上限です。期待深度3.592とは異なり、サンプルが停止してもバッチ全体の計算を続ける実装なので、そのまま高速化の証拠にもなりません。
+
+## BDEを含む検討履歴
+
+結合の切れやすさ（BDE）をBonDNetで高速推定し、エッジと周辺ノードへ反映する方法を検討しました。GitにはBDE-db2への変換・再学習・HDF5遅延読込の実装履歴もあります。しかし、確認できた実BDE比較は**公式bdncm/20200808重み**のcacheによるものです。BDE-db2再学習後の予測精度向上を、これらの結果から主張することはできません。
+
+| 2026-06予備検証（先頭5,000件・1 seed・8 epoch・96/4/4） | Val Cosine | Top5 | Top10 | Top20 |
+|---|---:|---:|---:|---:|
+| 全エッジ特徴量 + 実BDE | 0.736048 | 0.560887 | 0.632056 | 0.684173 |
+| BDE除外 | 0.735646 | 0.560887 | 0.633669 | 0.685484 |
+| BDEだけのエッジ | 0.741813 | 0.558065 | 0.629839 | 0.687399 |
+| BDEノード集約（別の特徴量確認試験） | 0.741561 | 0.556855 | 0.630645 | 0.681552 |
+
+全エッジでBDE有無のCosine差は+0.000402、BDE列を隠すと-0.000152で、依存は弱い結果でした。ノード集約もTop-kを一様には改善せず、採用を支える大規模証拠はありません。cache命中は20,082/49,902件（40.2%）で、元素対応と低カバレッジも制約です。EIの開裂は中性分子のBDEだけでなくイオン化後の電荷・ラジカル・転位・二次開裂に依存するため、単純なBDE列で十分説明できなかった可能性があります。**BDE一般が無意味と結論したのではなく、本実装の標準入力から外した判断です。** [BDEの数値](docs/research/evidence/HIST-BDE/edge_compare_summary.csv)。
+
+## Version履歴
+
+ソフトウェア版（v1.x）、過去の設計名（v4.x/v5.x）、研究ID（EXP-Vxxx）は別です。コミットがあることと、性能向上を確認したことも分けます。
+
+| 時期 / 版 | 主な変更と判断 | Git履歴 / 研究記録 |
+|---|---|---|
+| 2025-12 BDE検討期 | BonDNet公式重み、BDE-db2再学習経路、HDF5ストリーミング、atom mapping修正 | [39fece3](https://github.com/turnDeep/NExtIMS/commit/39fece3)、[33c6995](https://github.com/turnDeep/NExtIMS/commit/33c6995)、[5e22e05](https://github.com/turnDeep/NExtIMS/commit/5e22e05)、[306daa8](https://github.com/turnDeep/NExtIMS/commit/306daa8) |
+| 2026-01 設計v4.x/v5.x | 特徴量・立体情報、768/14/24、勾配checkpointing。設計名はパッケージ版ではない | [ad101a6](https://github.com/turnDeep/NExtIMS/commit/ad101a6)、[d3c2107](https://github.com/turnDeep/NExtIMS/commit/d3c2107)、[b836643](https://github.com/turnDeep/NExtIMS/commit/b836643) |
+| 2026-01 ソフトウェアv1.0.0 | 初回リリースの記録 | [6ed883b](https://github.com/turnDeep/NExtIMS/commit/6ed883b) |
+| 2026-02 設計v5.3 | 1280/16/32の大型化案。現在の標準では撤回 | [86bd215](https://github.com/turnDeep/NExtIMS/commit/86bd215) |
+| 2026-04 ACT | OpenMythosを参考に共有反復ブロックと適応停止を導入 | [ad42c32](https://github.com/turnDeep/NExtIMS/commit/ad42c32) |
+| 2026-06 PR214 | 標準を768/14/24へ。GPU名からモデル容量を決める方針を撤回 | [cd0727c](https://github.com/turnDeep/NExtIMS/commit/cd0727c) |
+| 2026-06 graph features | mean/add/maxと分子量・組成を追加。分子イオン補助lossは後に削除 | [69d03ec](https://github.com/turnDeep/NExtIMS/commit/69d03ec)、[f67326e](https://github.com/turnDeep/NExtIMS/commit/f67326e) |
+| 2026-06 fusion | NL補助lossだけから、NL出力を実際に融合する構成へ | [d01a68e](https://github.com/turnDeep/NExtIMS/commit/d01a68e) |
+| 2026-06〜10 EXP-V001〜018 | 特徴量・可変fusion・単一head・TRM・電荷枝・正則化を比較。条件と反証を記録 | [研究Version一覧](docs/research/HISTORY.md) |
+| 2026-10 EXP-V019〜021 | SAM、部品除外、feedback OFFでのACT直接比較 | [検証結果と考察](docs/research/RESULTS.md) |
+| 2026-10-11 v1.1.0 / EXP-V022 | 現行CLIを公開、BDE/DGL/BonDNet/Claudeの実行依存を撤去、全量検証は進行中 | [現行構成の範囲](docs/research/RESULTS.md#全量検証exp-v022) |
+
+全Git履歴の保存済みスナップショットは[git_history.csv](docs/research/evidence/git_history.csv)、検証CSVの出典とSHA256は[manifest.json](docs/research/evidence/manifest.json)にあります。NIST本体、化合物別の評価行、巨大な重みは公開していません。
+
+## 限界と再現性
+
+- 小規模と大規模の絶対値を横断比較しません。モデル容量、split、更新数、checkpoint選択が違います。
+- EXP-V021までの改善は内部NISTデータの少数seedでの結果です。未登録化合物全般や法薬物の最終同定精度を保証しません。
+- EXP-V022の対象は原データ306,622件から有効グラフ302,667件（Train242,291 / Val30,153 / Test30,223）。全量学習中で最終結果は未確定です。過去に利用されたsplitであり、未使用の外部Testではありません。
+- Top-kは予測と実測の上位k個のm/z集合の一致数/kです。ゼロ強度の同順位binが入り得る従来定義を維持し、正強度ピークのみのrecallも補助出力します。
+- 予測MSPは実測標準ライブラリではありません。標準品・保持時間等との確認を併用してください。
+- ソースhashとレシピを保存し、異なるモデルコードの重みを拒否します。再開は同じパス・設定・ソース・データを使用してください。
 
 ```bash
-# モデル評価（ACT搭載モデルも自動で構成を読み込みます）
-python scripts/evaluate_minimal.py \
-    --model models/qcgn2oei_stable_act_refine.pth \
-    --nist-msp data/NIST17.MSP \
-    --visualize --benchmark \
-    --output-dir results/evaluation
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-### 推論
+旧仕様書は歴史資料です。現行の実行方法はこのREADMEと[QUICKSTART](QUICKSTART.md)を優先してください。MITライセンス（データセットの権利は別途確認）。
 
-```bash
-# ACT搭載モデルによる単一分子予測（画像出力付き）
-python scripts/predict_gnn_minimal.py \
-    --checkpoint models/qcgn2oei_stable_act_refine.pth \
-    --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
-    --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
-    --top-k 20 \
-    --output-spectrum outputs/pred_spectrum.csv \
-    --output-peaks outputs/top_peaks.csv \
-    --visualize \
-    --output-image outputs/predicted.png
-
-# 学習時4loop、推論時8loopでの確認（※学習時に refinement-max-steps=8 以上を指定している必要があります）
-python scripts/predict_gnn_minimal.py \
-    --checkpoint models/qcgn2oei_stable_act_refine.pth \
-    --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
-    --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
-    --refinement-steps 8 \
-    --top-k 20
-
-# ACTを無効化し、固定8ループで推論（比較検証用）
-python scripts/predict_gnn_minimal.py \
-    --checkpoint models/qcgn2oei_stable_act_refine.pth \
-    --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
-    --bde-cache data/processed/bde_cache/nist17_bde_cache.h5 \
-    --refinement-steps 8 \
-    --force-no-act \
-    --top-k 20
-```
-
-> [!WARNING]
-> `--refinement-max-steps` は学習時のチェックポイントと同じか小さく設定してください。学習時より大きい値を設定すると、`loop_embedding.weight` の形状エラー（次元不一致）が発生します。
-
-## 📁 プロジェクト構造
-
-```
-NExtIMS/
-├── setup.py                           # パッケージ設定 (v1.0)
-├── requirements.txt                   # Python依存関係
-├── README.md                          # このファイル
-│
-├── docs/
-│   ├── spec_v4.2_minimal_iterative.md    # 技術仕様書
-│   ├── PREDICTION_GUIDE.md               # 予測ガイド
-│   └── BDE_AWARE_PREDICTION.md           # BDE対応予測
-│
-├── scripts/
-│   ├── download_bondnet_pretrained.py    # Phase 0: BonDNetモデル取得
-│   ├── download_bde_db2.py               # Phase 0: BDE-db2ダウンロード
-│   ├── train_bondnet_bde_db2.py          # Phase 0: BonDNet学習
-│   ├── train_gnn_minimal.py              # GNN学習 (Main, ACT Refinement対応)
-│   ├── evaluate_minimal.py               # 評価
-│   ├── predict_gnn_minimal.py            # 推論 (ACT Refinement対応)
-│   ├── predict_single.py                 # 単一予測 (レガシー)
-│   └── predict_batch.py                  # バッチ予測 (レガシー)
-│
-├── src/
-│   ├── models/
-│   │   ├── qcgn2oei_minimal.py          # GNNモデル (v1.0 Architecture)
-│   │   └── modules.py                    # 共通モジュール
-│   ├── data/
-│   │   ├── nist_dataset.py              # NIST17データローダー
-│   │   ├── graph_generator_minimal.py   # グラフ生成
-│   │   ├── features_qcgn.py             # 特徴量抽出 (34/10 dim)
-│   │   ├── filters.py                   # データフィルタリング
-│   │   └── bde_generator.py             # BDE計算
-│   └── training/
-│       └── losses.py                     # 損失関数
-│
-├── tests/
-│   ├── test_evaluation_metrics.py       # 評価メトリクステスト
-│   └── test_prediction.py               # 予測機能テスト
-│
-└── data/
-    ├── NIST17.MSP                        # NIST EI-MSデータ
-    └── processed/
-        └── bde_cache/                    # BDE計算キャッシュ
-```
-
-## 🔬 使用例
-
-### 例1: エタノールのスペクトル予測
-
-```bash
-nextims-predict "CCO" --model models/qcgn2oei_best.pth --visualize --output ethanol_spectrum.png
-```
-
-### 例2: バッチ予測（CSV入力）
-
-**molecules.csv**:
-```csv
-smiles,id,name
-CCO,mol_001,ethanol
-CC(C)O,mol_002,isopropanol
-```
-
-```bash
-nextims-predict-batch \
-    --input molecules.csv \
-    --output predictions.csv \
-    --model models/qcgn2oei_best.pth
-```
-
-## 🔧 設定
-
-主なハイパーパラメータは `scripts/train_gnn_minimal.py` の引数、またはモデル内のデフォルト値として定義されています。
-
-- **Node Dim**: 34
-- **Edge Dim**: 10
-- **Hidden Dim**: 768
-- **Layers**: 14
-- **Heads**: 24
-- **Neutral-loss fusion weight**: 0.30
-
-## 🧪 テスト
-
-```bash
-# 全テスト実行
-pytest tests/
-```
-
-## 📝 ライセンス
-
-MIT License
-
-## 🤝 貢献
-
-Issue、Pull Requestを歓迎します！
-
-## 📧 連絡先
-
-- GitHub Issues: https://github.com/turnDeep/NExtIMS/issues
-
----
-
-**バージョン**: NExtIMS v1.0
-**最終更新**: 2025-12-03
-**ステータス**: Released
+公開前の動作確認では、新しいCPU Docker環境で59件のunit testと、768/14/24の合成データ学習・保存・再開・予測・再評価が成功しました。wheelをインストールした作業フォルダ外からの予測も確認しています。これは実行経路の検査で、NISTの精度検証やRTX5090の再検証ではありません。[動作確認の範囲と再現手順](docs/research/RELEASE_VALIDATION.md)。

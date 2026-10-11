@@ -102,7 +102,7 @@ class BatchPredictor:
         logger.info("Initializing graph generator...")
         self.graph_gen = MinimalGraphGenerator(
             bde_cache_path=bde_cache_path,
-            use_bde_calculator=bde_cache_path is None,
+            use_bde_calculator=False,
             default_bde=85.0
         )
 

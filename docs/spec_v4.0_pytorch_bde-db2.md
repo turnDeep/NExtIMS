@@ -1,4 +1,6 @@
 # QC-GN2oMS2-EI システム詳細技術仕様書 v4.0
+
+> 歴史資料: BDE/DGL/BonDNetはv1.1.0の実行環境から削除されています。現行の手順はルートREADME、検討の経緯は[研究履歴](research/HISTORY.md)を参照してください。
 ## PyTorch統一環境・BonDNet BDE-db2デフォルト版
 
 **作成日**: 2025-12-02

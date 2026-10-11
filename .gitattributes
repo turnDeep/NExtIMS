@@ -1,0 +1,14 @@
+*.py text eol=lf
+*.md text eol=lf
+*.csv text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+
+# Frozen checkpoint-provenance sources have mixed historical line endings.
+scripts/spectral_feedback_support/*.py -text
+scripts/run_spectral_feedback_experiment.py -text
+scripts/run_feedback_generalization_experiment.py -text
+scripts/run_generalization_algorithms.py -text
+scripts/run_component_ablation.py -text
+scripts/run_full_feedback_off_experiment.py -text

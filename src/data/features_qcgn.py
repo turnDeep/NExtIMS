@@ -113,7 +113,7 @@ class QCGNFeaturizer:
 
     def __init__(
         self,
-        use_bde: bool = True,
+        use_bde: bool = False,
         bde_min: float = 50.0,
         bde_max: float = 200.0
     ):

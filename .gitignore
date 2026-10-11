@@ -77,3 +77,13 @@ wandb/
 
 # Dev Container
 .devcontainer/.env
+
+# Private research inputs/runs; publish curated aggregate evidence only.
+paper_runs/
+work/
+*.sqlite
+*.sqlite-*
+*.MSP
+*.MOL
+*.SDF
+.venv-*/

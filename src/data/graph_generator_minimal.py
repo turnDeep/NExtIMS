@@ -1,23 +1,9 @@
 #!/usr/bin/env python3
 # src/data/graph_generator_minimal.py
-"""
-NExtIMS v4.2: Minimal Graph Generator with BDE Integration
+"""Legacy graph generator without BDE dependencies.
 
-Generates PyTorch Geometric graphs for the QCGN2oEI_Minimal model:
-- 16-dim node features (QC-GN2oMS2 style)
-- 3-dim edge features (bond_order + BDE + in_ring)
-- Integrates BDE from pre-computed cache or on-the-fly calculation
-
-This replaces the v2.0 graph generation which used:
-- 48-dim node features
-- 6-dim edge features (without BDE)
-- ECFP hybrid approach
-
-Design Philosophy (v4.2):
-- Minimal features to reduce overfitting
-- BDE-enriched edges for fragmentation modeling
-- Pre-computed BDE cache for efficiency
-- Fallback to on-the-fly BDE calculation if needed
+The 10-column edge layout is preserved; the unused BDE column is constant 0.5.
+Current training and prediction use scripts/nextims.py and its frozen support.
 """
 
 import logging
@@ -31,7 +17,6 @@ from rdkit.Chem import Descriptors, rdMolDescriptors
 from torch_geometric.data import Data
 
 from src.data.features_qcgn import QCGNFeaturizer
-from src.data.bde_calculator import BDECalculator, BDECache
 
 logger = logging.getLogger(__name__)
 
@@ -59,40 +44,14 @@ COMMON_NEUTRAL_LOSSES = (15, 18, 28, 29, 31, 32, 42, 43, 44, 45, 46, 60, 73)
 
 
 class MinimalGraphGenerator:
-    """
-    Minimal graph generator for NExtIMS v4.2
-
-    Generates PyG graphs with:
-    - 16-dim node features (atom types + ionization energy)
-    - 3-dim edge features (bond_order + BDE + in_ring)
-
-    BDE Integration:
-    - Priority 1: Pre-computed HDF5 cache (fastest)
-    - Priority 2: On-the-fly BonDNet calculation (slower)
-    - Priority 3: Default BDE value (fallback)
-
-    Usage:
-        # With pre-computed BDE cache
-        gen = MinimalGraphGenerator(
-            bde_cache_path="data/processed/bde_cache/nist17_bde_cache.h5"
-        )
-
-        # With on-the-fly BDE calculation
-        gen = MinimalGraphGenerator(
-            use_bde_calculator=True,
-            bondnet_model="bdncm/20200808"
-        )
-
-        # Generate graph
-        graph = gen.mol_to_graph(mol, spectrum=spectrum_array)
-    """
+    """Legacy graph conversion; BDE execution was retired in v1.1.0."""
 
     def __init__(
         self,
         bde_cache_path: Optional[str] = None,
         use_bde_calculator: bool = False,
-        bondnet_model: Optional[str] = "bdncm/20200808",
-        use_bde: bool = True,
+        bondnet_model: Optional[str] = None,
+        use_bde: bool = False,
         use_mass_features: bool = True,
         use_formula_features: bool = True,
         use_fragment_candidates: bool = False,
@@ -119,7 +78,9 @@ class MinimalGraphGenerator:
             bde_max: Maximum BDE for normalization (kcal/mol)
             default_bde: Default BDE if cache miss and no calculator
         """
-        self.use_bde = use_bde
+        if use_bde or bde_cache_path or use_bde_calculator or bondnet_model:
+            raise ValueError("BDE execution was removed. Use no-BDE checkpoints or the historical Git revision.")
+        self.use_bde = False
         self.use_mass_features = use_mass_features
         self.use_formula_features = use_formula_features
         self.use_fragment_candidates = use_fragment_candidates
@@ -136,43 +97,7 @@ class MinimalGraphGenerator:
             bde_max=bde_max
         )
 
-        # Initialize BDE cache
-        self.bde_cache = None
-        if use_bde and bde_cache_path:
-            cache_path = Path(bde_cache_path)
-            if cache_path.exists():
-                try:
-                    self.bde_cache = BDECache(str(cache_path))
-                    self.bde_cache.open('r')
-                    stats = self.bde_cache.get_stats()
-                    logger.info(f"Loaded BDE cache: {stats.get('num_molecules', 0):,} molecules")
-                except Exception as e:
-                    logger.warning(f"Failed to load BDE cache: {e}")
-                    self.bde_cache = None
-            else:
-                logger.warning(f"BDE cache not found: {bde_cache_path}")
-
-        # Initialize BDE calculator (optional)
-        self.bde_calculator = None
-        if use_bde and use_bde_calculator:
-            try:
-                model_path = Path(str(bondnet_model)) if bondnet_model else None
-                if model_path is not None and model_path.exists():
-                    self.bde_calculator = BDECalculator(model_path=str(model_path))
-                else:
-                    self.bde_calculator = BDECalculator(model_name=bondnet_model)
-                logger.info("BDE calculator initialized (on-the-fly mode)")
-            except Exception as e:
-                logger.warning(f"Failed to initialize BDE calculator: {e}")
-                logger.warning("Will use default BDE values")
-
-        # Statistics
-        self.stats = {
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'calculator_calls': 0,
-            'default_bde_used': 0
-        }
+        self.stats = {"molecules": 0}
 
     def get_graph_features(self, mol: Chem.Mol) -> Tuple[np.ndarray, float, int]:
         """
@@ -264,48 +189,9 @@ class MinimalGraphGenerator:
         return mask
 
     def get_bde_for_molecule(self, mol: Chem.Mol, smiles: str) -> Dict[int, float]:
-        """
-        Get BDE values for all bonds in molecule
-
-        Priority:
-        1. BDE cache (pre-computed)
-        2. BDE calculator (on-the-fly)
-        3. Default BDE value
-
-        Args:
-            mol: RDKit Mol object
-            smiles: SMILES string (for cache lookup)
-
-        Returns:
-            bde_dict: {bond_idx: BDE (kcal/mol)}
-        """
-        if not self.use_bde:
-            num_bonds = mol.GetNumBonds()
-            return {i: self.default_bde for i in range(num_bonds)}
-
-        # Priority 1: Check cache
-        if self.bde_cache:
-            bde_dict = self.bde_cache.get(smiles)
-            if bde_dict is not None:
-                self.stats['cache_hits'] += 1
-                return bde_dict
-            else:
-                self.stats['cache_misses'] += 1
-
-        # Priority 2: Calculate on-the-fly
-        if self.bde_calculator:
-            try:
-                bde_dict = self.bde_calculator.calculate_bde(smiles)
-                if bde_dict:
-                    self.stats['calculator_calls'] += 1
-                    return bde_dict
-            except Exception as e:
-                logger.debug(f"BDE calculation failed for {smiles}: {e}")
-
-        # Priority 3: Default BDE for all bonds
-        self.stats['default_bde_used'] += 1
-        num_bonds = mol.GetNumBonds()
-        return {i: self.default_bde for i in range(num_bonds)}
+        """Compatibility argument only; the disabled BDE column is constant."""
+        self.stats["molecules"] += 1
+        return {}
 
     def mol_to_graph(
         self,
@@ -435,40 +321,10 @@ class MinimalGraphGenerator:
         return self.mol_to_graph(mol, smiles=smiles, spectrum=spectrum, **kwargs)
 
     def get_stats(self) -> Dict:
-        """
-        Get BDE usage statistics
-
-        Returns:
-            stats: Dictionary with cache hits, misses, etc.
-        """
-        total = sum(self.stats.values())
-        stats_with_pct = {
-            'total_molecules': total,
-            'cache_hits': self.stats['cache_hits'],
-            'cache_hits_pct': self.stats['cache_hits'] / total * 100 if total > 0 else 0,
-            'cache_misses': self.stats['cache_misses'],
-            'calculator_calls': self.stats['calculator_calls'],
-            'default_bde_used': self.stats['default_bde_used'],
-        }
-        return stats_with_pct
+        return dict(total_molecules=self.stats["molecules"], bde_enabled=False)
 
     def print_stats(self):
-        """Print BDE usage statistics"""
-        stats = self.get_stats()
-        logger.info("BDE Usage Statistics:")
-        logger.info(f"  Total molecules: {stats['total_molecules']:,}")
-        logger.info(f"  Cache hits: {stats['cache_hits']:,} ({stats['cache_hits_pct']:.1f}%)")
-        logger.info(f"  Cache misses: {stats['cache_misses']:,}")
-        logger.info(f"  Calculator calls: {stats['calculator_calls']:,}")
-        logger.info(f"  Default BDE used: {stats['default_bde_used']:,}")
-
-    def __del__(self):
-        """Cleanup: close BDE cache"""
-        if self.bde_cache:
-            try:
-                self.bde_cache.close()
-            except Exception:
-                pass
+        logger.info("Graph records: %s; BDE disabled", self.stats["molecules"])
 
 
 # Example usage and testing

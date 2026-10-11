@@ -1,0 +1,591 @@
+commit,date,subject
+ef30415a360055b2fbd3ec884622b911fd868109,2026-06-11,Merge pull request #216 from turnDeep/feature/openmythos-act-refinement-2545648026050667703
+d01a68e30d1b40e72c57d5a290da3f2e97a0110d,2026-06-11,Adopt neutral loss fusion prediction
+29a4d036275bd79c8463e45059e3aa25883f69bc,2026-06-11,Merge pull request #215 from turnDeep/feature/openmythos-act-refinement-2545648026050667703
+f67326e3845f63d566cf84cefe048713e3220315,2026-06-11,Remove molecular ion auxiliary loss
+69d03ec85ea90bc9f8dab911b3682c263c30bc76,2026-06-10,Add chemistry-aware pooling and molecular ion loss
+faa828d0b3c10dbd1102c3a44c09d56870c5fe9f,2026-06-10,Delete test_viz_new.png
+5875fc112aa98e7447d40e3faaaacc9f272231a8,2026-06-10,Delete delta9-THC_spectrum.png
+1fb0bcdebbf72a3c2e0ccc3566dc3e4d5248734e,2026-06-10,Delete HHC_spectrum.png
+461383943c40980e51daa66f37614ec1162bda57,2026-06-10,Delete delta8-THC_spectrum.png
+cfcec93b0e1d18daf52c33a217957132492ef7d9,2026-06-10,Merge pull request #214 from turnDeep/feature/openmythos-act-refinement-2545648026050667703
+cd0727c4eb14b7beef41af3b428ddc1423464f42,2026-06-10,Align ACT defaults with RTX 5070 Ti baseline
+4bff603b499ff6424fca44e2129cec9e4d3fa7f1,2026-05-12,feat(train): add automated hyperparameter tuning script with early stopping
+dceb40824d076105c14a68f8e4052da19496d29c,2026-05-07,feat(train): add automated hyperparameter tuning script with early stopping
+8f362d5b8fabee83cc971b9bb933ca53b5b91738,2026-05-07,feat(predict): normalize spectrum output to relative intensity (base peak = 100)
+7116d397c48bbf7540bbf0957239e07ea928603f,2026-05-07,docs: update evaluate section in README to reflect new ACT checkpoint
+eea7d430a382dff48d24945ee3dc46ec477029d2,2026-05-06,fix(evaluate): resolve state_dict loading error for ACT checkpoints
+f895ca464c1bc95240d60f3f9fa2a3c6bdfed2dd,2026-04-28,docs: update README with visualization options for predict_gnn_minimal
+20ed0c3f11eeb00f3558cca4388dd60d9bff792a,2026-04-28,feat(predict): add visualization to predict_gnn_minimal
+b749efa0288572033dfe2b508b45dda439bd1918,2026-04-28,docs: update README with OpenMythos ACT refinement usage instructions
+ad42c32c9c61eaa0908c80094781cf157283a2a7,2026-04-28,feat(models): integrate OpenMythos stable ACT recurrent refinement
+2b7c567cea9d4c88e02a7f4f73f505f4c88116f3,2026-03-02,Merge pull request #213 from turnDeep/add-memory-estimator-7188468340679723120
+86bd21592ccb77b8ae70a187a90fb4d658e36030,2026-02-27,Update model defaults to v5.3 Ultra-Wide (1280/16/32) with stability fixes
+7bf193c40dc78dbed6f92b2b7858552830f9c9cc,2026-02-19,Update model defaults to high-performance configuration (1024/20/32)
+786ec0aa6cecc9194dcbb185a8519fd588765213,2026-02-19,Add memory usage estimation script for QCGN2oEI_Minimal
+7074789c58f9cc1567cf4572141c70e2e531b302,2026-01-21,Merge pull request #210 from turnDeep/release-v1.0-6742447084328811107
+6ed883b7f4ee8c075c8131b78384380f1d26b048,2026-01-21,Release NExtIMS v1.0.0
+4ca3c48426822b1d846089244c47b3fc7496f56e,2026-01-13,Merge pull request #208 from turnDeep/update-visualization-6673816138523417816
+be21b104ca92ff3a41f19f04c1478cfbf47a3052,2026-01-13,"Refine visualization in predict_single.py: normalize intensity, label top peaks, remove markers, and limit x-axis"
+664836e1c44bbe22d4fc79e141bb602cd34c29fe,2026-01-13,Update QCGN2oEI_Minimal model architecture and params
+cd6a163842daa289898f04a4a271e2ff4e90b126,2026-01-13,Update GNN training parameters for improved performance
+0f79aec7df48c3bfcc1c2ac087c561cea813c77d,2026-01-13,Update model parameters in predict_single.py
+165f9a40e864b06c225c97f25a8c20c2b85106aa,2026-01-13,Update model parameters in predict_batch.py
+8e86cb05c6f586913b04d130f3ceaf951cf91dc8,2026-01-13,Increase model parameters for evaluation
+8137d74052b5667fcc6e3cc5fc8c088fb763318f,2026-01-12,Add files via upload
+b1daeb135c80b02f443cbb314574b9257fcd99b5,2026-01-10,Merge pull request #203 from turnDeep/fix-predict-single-args-2700713365642740262
+e960a19389991d56d05333afc4952c652a53054e,2026-01-10,fix: unpack arguments in predict_single.py to prevent TypeError
+dbb0113631215211c33e0d4992ef0a5a32a0ecc3,2026-01-10,fix: unpack arguments in predict_single.py to prevent TypeError
+8b825e6b872f839236cf97e377beab224e441646,2026-01-10,Merge pull request #202 from turnDeep/feature/enhance-gnn-features-v4.3-8174982372376406706
+ad101a6ce936f218f163b366b982c24aea11ebc9,2026-01-08,feat(v4.4): add stereochemistry features and scale up model architecture
+95fab08b90f35979e430ad2c4a04bfbb4700d14a,2026-01-09,Add files via upload
+890feb3eeaa4bc53e85eab4b523ebf77634bc44c,2026-01-08,Merge pull request #201 from turnDeep/feature/enhance-gnn-features-v4.3-8174982372376406706
+00848fb456ef6ed9ed6f6f4155a056033286b108,2026-01-08,feat(model): enhance GNN features to v4.3 configuration
+5294ce237da88d0da95c6fcb905d3e0b9044799c,2026-01-08,Merge pull request #200 from turnDeep/feature/enhance-gnn-features-v4.3-8174982372376406706
+cbe58ce9e8d077516aaab2ccdc5bfd051d88399f,2026-01-08,feat(model): enhance GNN features to v4.3 configuration
+4e3abd55ee6b0a41f13a3913ed2f71405252ce0c,2026-01-08,Merge pull request #199 from turnDeep/feature/enhance-gnn-features-v4.3-8174982372376406706
+d50b9ef0e8a17752198147214220ba2ef29000eb,2026-01-07,feat(model): enhance GNN features to v4.3 configuration
+c6d14880bb99e5b5b7201c51071e79cb82105772,2026-01-07,Merge pull request #198 from turnDeep/logging-improvements-11488498300134033639
+0e7430b52a0bafc93442192c88dcfd55a7a987cf,2026-01-07,feat: display running averages in training progress bar
+5fe780443c29fa6b9edc8039b1961bef10dccfb0,2026-01-07,Merge pull request #197 from turnDeep/feature/enhance-gnn-features-v4.3-8174982372376406706
+cf407222ff84fc4ef7027e2566ca733d527d04f1,2026-01-07,feat(model): enhance GNN features to v4.3 configuration
+684c4bf80b2ab1fefc16c830d9fdd40f079ac4af,2026-01-07,feat(model): enhance GNN features to v4.3 configuration
+89725c5491c00018754de2348d856134384b0475,2026-01-07,Merge pull request #196 from turnDeep/fix-prediction-scripts-forward-call-18405742606143763374
+3083244ddbf80360beceb17fe9f6d5f9d8c4de9a,2026-01-07,Fix model forward call in prediction scripts
+336f8ea9407f49d3aa59a0d02ce249d500936c18,2026-01-07,Merge pull request #195 from turnDeep/fix-gnn-training-shape-mismatch-13731108431630275948
+8cfda7c48234f026f94a6ebec40fbc6432aa3044,2026-01-06,Fix training crash on invalid molecules
+6db4aa5f655ddb55b41e787827c7fcab47a31a5c,2026-01-07,Merge pull request #194 from turnDeep/fix-gnn-training-shape-mismatch-13731108431630275948
+146cf3032bf63214dd287dad8309abf83283534a,2026-01-07,Delete results/evaluation/evaluation_report.json
+4c1e312c9cab4361168c0ee385a24c93539c02f0,2026-01-06,Fix benchmark crash on invalid SMILES
+65f542eebf44fe358fcc008e52846deb9e2428d5,2026-01-06,Delete results/evaluation directory
+c8f15057ac749aae29dce5d8519c17a5ad966725,2026-01-06,Merge pull request #193 from turnDeep/fix-gnn-training-shape-mismatch-13731108431630275948
+b005617a85f7b40ab640cabdd9ca26fa79a0a54d,2026-01-06,Suppress RDKit errors and handle invalid SMILES in evaluation script
+a147aa794f0d4bdec600f5c1dd71f8126e5f0985,2026-01-06,Fix evaluation error: incorrect forward call and invalid kwarg
+3e96a7637dbbabde0e8c135b85267f2fecabaa3d,2026-01-06,Merge pull request #192 from turnDeep/fix-gnn-training-shape-mismatch-13731108431630275948
+9d9f54bf9f9e414b3d36b85c773b5e8ba601e793,2026-01-06,Fix tensor shape mismatch in GNN training loop
+079f9b620ec12fb8c580d4c1adf0ddf383d46aa4,2026-01-06,Merge pull request #191 from turnDeep/remove-distillation-remnants-11813942262802060782
+ac3d5aae5dcb3640463c27d8cf329ba0938ec9dd,2026-01-06,Fix train_gnn_minimal args and remove distillation remnants
+78854e9c0ee6e917cc9c8f948b2f654e9467a33c,2026-01-06,Merge pull request #189 from turnDeep/remove-distillation-remnants-11813942262802060782
+53a068604c92a727d00c051b8813373e1723b7e4,2026-01-06,Remove teacher-student distillation remnants
+407cd15b26bf2b072c48401ccd51efcbf40df81d,2025-12-30,Merge pull request #188 from turnDeep/fix-bde-db2-column-names-17254491747087773342
+306daa8f816e89b561c9bed1ead5bd4e69d0803f,2025-12-30,Fix: Update convert_bde_db2_to_bondnet.py to read 'bde' and 'bdfe' columns
+e1d56b2095bedfa47945fc74f070eeda51440483,2025-12-29,Update patience parameter in training command
+a5418fbb74e477e7b80fd440d1850d40da940bdb,2025-12-29,Update training script parameters in README
+29bf925810bfab5ca674de734a9fc082cd438bfb,2025-12-28,Merge pull request #187 from turnDeep/add-early-stopping-bondnet-3104697120507661505
+7776b2283cc295e434ca4410006017552fa5261e,2025-12-28,Fix formatting for training command in README
+f63c4e70a9ca5b723afa3ae15f2457495d666612,2025-12-28,Add early stopping to BonDNet training script
+064debd65602a7ba44a0ff169be5d31669442eca,2025-12-28,Change prefetch factor from 2 to 4
+2f4188b9751ecb4d9e57cbfbe1a59a0ef6a048a4,2025-12-28,Fix formatting of Python command in README
+931f034ea18667f057272c089ed8b1d9e7e687a4,2025-12-28,Add cache_graphs option for dataset loading
+b89ed1537025a3c8c2136bd7b15704a87eab1470,2025-12-28,Refactor HDF5 handling and add pickling support
+bc179ee556db254a64b71111cde34f755f68b523,2025-12-28,Integrate tqdm for progress tracking in training
+0da5a57a2af0f39be6a49b22b60a3c41639402bc,2025-12-28,Clean up whitespace in train_bondnet_bde_db2.py
+6f1b894c519d366e19e10b7972183714de94c688,2025-12-28,Remove unnecessary blank lines in convert_bde_db2_to_bondnet.py
+aaf81c0843c77749f349992bd142dcc2cc239bfb,2025-12-28,Refactor bond mapping validation logic
+f8449bdf2a0f1e16618548a726d1d9514d53d1f6,2025-12-28,Merge pull request #185 from turnDeep/fix-bondnet-assertion-error-15510334371021503510
+cb870670e07c944aa042eb554fb37196b2fa4ac7,2025-12-28,Fix: Correct mapping direction in conversion and auto-fix inverted data on load
+3bc13621701e46df11f5b4ab177a6648a4f21242,2025-12-28,Merge pull request #184 from turnDeep/fix-bondnet-assertion-error-15510334371021503510
+cc48e4259bffca0a4412bf5c4bde995c0f81e92e,2025-12-28,Fix: Handle None samples during BondNet training initialization
+2cfcfb2d7bc041f1e359a46957bd6d9238cd909b,2025-12-28,Fix: Validate all atom mappings in BonDNetHDF5Dataset
+5cb4ac817aaa78a2b9ed045caf9becb54c51f77e,2025-12-24,Merge pull request #183 from turnDeep/fix-bondnet-assertion-error-15510334371021503510
+1c52f1ceff1f3be4b013abeb40443159cb45f258,2025-12-23,Fix: Filter invalid atom mappings in BonDNetHDF5Dataset
+2951df2cbbf91d3f93bcc99a0dc9325b597153c8,2025-12-24,Update train_bondnet_bde_db2.py
+6978f887fe60f073cc39bc43d621680774d08872,2025-12-24,Refactor whitespace and formatting in convert_bde_db2_to_bondnet.py
+a679f137b49a7b6b618c429d61fda2c965f1fbe3,2025-12-24,Refactor molecule and reaction loading logic
+0cf2764f32eb36f0cf2bedafddb9f5e27704eb05,2025-12-24,Merge pull request #182 from turnDeep/fix-bondnet-empty-mapping-17640904293189172569
+ec72105613e30656842dd4d2ac06598648e9c6df,2025-12-23,"Fix BDE mappings, implement streaming JSONL, and fix variable shadowing"
+fbe9d85e68b296911d8e3bcd11b691fb552b72d6,2025-12-24,Merge pull request #181 from turnDeep/fix-bondnet-empty-mapping-17640904293189172569
+9112f002c6fd7250c6071937672ff1983b391deb,2025-12-23,Implement streaming JSONL processing and fix missing mappings
+26fefaac951bbba3aad6c7bcef964a5f7deff542,2025-12-23,Merge pull request #180 from turnDeep/fix-bondnet-empty-mapping-17640904293189172569
+2822f4355e71fdafd51ea098de0acd78ad800c80,2025-12-22,Implement missing mapping generation in BDE-db2 converter
+05905301ddb0f05c08eec773d0f41f6496aaf09b,2025-12-23,Merge pull request #179 from turnDeep/fix-bondnet-empty-mapping-17640904293189172569
+12adccc6ce30d40fa488c61fc5138a7ca5c38425,2025-12-22,Fix AssertionError in BonDNet training by validating and skipping corrupted samples
+abeca6a70371af1b59fb5466c9c9efbc8260d57c,2025-12-22,Fix ValueError in BonDNetHDF5Dataset due to empty mappings
+13767f450d04352670ca23e378e961b511a5ceeb,2025-12-23,Merge pull request #178 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+cb6c08325fbd11a9ee03257641a4847d89356156,2025-12-22,fix: Resolve DGLError for missing global node type in HDF5 dataset
+13335b871c4d6b7d1d6dfef13657b3935bc687b7,2025-12-23,Merge pull request #177 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+1b3bf8b9dcafb50c3072a7f60e728ceb356f5162,2025-12-22,fix: Resolve ReduceLROnPlateau TypeError and potential 0-atom molecule crash
+6263847145fd037004760bafdaed431f66edb420,2025-12-23,Merge pull request #176 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+7a019683246d46acc6bc2b52669aab9bf46225cf,2025-12-22,fix: Resolve KeyError and AttributeError in HDF5 conversion for BonDNet
+db5e6b36f82c20acdd6a0c7d6c7832210b59797d,2025-12-23,Merge pull request #175 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+c738690d8f24e5a3ee5fcedef3a432b152bc895e,2025-12-22,fix: Improve HDF5 conversion memory efficiency and fix Attribute/Model compatibility
+dfaa3054effd5a2d936211d9aef4328869f2c16f,2025-12-23,Merge pull request #174 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+5e22e05371a4403796da9b57f534cb991edcccb2,2025-12-22,feat: Implement streaming HDF5 support for BonDNet training to fix memory issues
+12af1c3c3747271376cb64dce9e56ee6ddeb6214,2025-12-22,Merge pull request #172 from turnDeep/feature/bondnet-hdf5-memory-opt-7605905109809015689
+33c69951ef4da622b5a721199c19ae65a5ba05fa,2025-12-22,feat: Implement HDF5 support for BonDNet training to reduce memory usage
+9e26befc4a95e4355ce8293fc7ef7ac24ec97819,2025-12-17,Merge pull request #171 from turnDeep/claude/debug-bondnet-training-YbU4x
+362a8076df50793d97b1dd09e17bb92306ea72d3,2025-12-16,Revert batch size to default 64 and update documentation
+14d171622df6f96fbe6a9fe5faba33876e917ef3,2025-12-16,Implement HDF5 streaming loader for BonDNet to solve OOM issue
+1cc3bd952473a582226ce0d0801cc329141f2597,2025-12-17,Merge pull request #170 from turnDeep/claude/debug-bondnet-training-YbU4x
+03b22ab1a031f3142a0f0d9c0071b14c10a2fd24,2025-12-16,Fix OOM error: Reduce batch size from 64 to 16 for large datasets
+eecf2d012420ca6a563d225cac30f7ff0963b646,2025-12-16,Merge pull request #169 from turnDeep/claude/debug-bondnet-training-YbU4x
+2713b31f4f60e79a83bf748a95ea3489b9313c0d,2025-12-16,Fix transfer learning: BonDNet --restore expects integer and loads from checkpoint.pkl
+c603c19a505b8c47cd4029d6a16aa4f833d84c74,2025-12-16,Merge pull request #168 from turnDeep/claude/debug-bondnet-training-YbU4x
+a5a92046492fff3d2375dd7c10cdb38182226ff3,2025-12-16,Improve pretrained model download to handle existing repository
+30637f005ed3f88d17a014a1e53ec199ceb8cb46,2025-12-16,Merge pull request #167 from turnDeep/claude/debug-bondnet-training-YbU4x
+39fece34763627eb008b9f69e8320de6e57d2ad5,2025-12-16,Fix pretrained model download to support .pkl checkpoint files
+0a3fdd40e785274d439a22f4ad2715abcabfe7f0,2025-12-16,Merge pull request #166 from turnDeep/claude/debug-bondnet-training-YbU4x
+9b933319ee0e9e250cdcd8fe8818764f586f33d5,2025-12-16,Add transfer learning support for BonDNet training
+e7fb962abf06883c13a0128390a52dcc975055ac,2025-12-15,Update .gitignore to exclude external data and BonDNet training data
+7a42524f8202aa713d4943a8cf2097a577d00972,2025-12-16,Merge pull request #165 from turnDeep/claude/debug-bondnet-training-YbU4x
+3959640fb359f0c3e49595c73db3ce4d8b849603,2025-12-15,Complete fragment support for BonDNet data conversion
+a4556165e35d30a00a5aab39a436684d9be87c2c,2025-12-15,WIP: Add fragment support to BonDNet data conversion (part 1/2)
+4839659f7b8e03e4f9b23d1574961773a8827cae,2025-12-16,Merge pull request #164 from turnDeep/claude/debug-bondnet-training-YbU4x
+f7ce3339014ba9d887939c32edc7be588c960e92,2025-12-15,Add 'energy' key to reactions.yaml for BonDNet compatibility
+d54386f61284d06431a1e1c5a20e29e1b8f9ebbc,2025-12-16,Merge pull request #163 from turnDeep/claude/debug-bondnet-training-YbU4x
+de330968f9c5e09704eb21803e6dde355b9bda32,2025-12-15,Fix molecule_attributes.yaml format to use list instead of dict
+eda3af847e6ea12e3de2d83518a37945c4258ad6,2025-12-16,Merge pull request #162 from turnDeep/claude/debug-bondnet-training-YbU4x
+93932f41bc04b3e062eb260a4053797645eac713,2025-12-15,Fix BonDNet training data generation script to ensure consistency
+4994bee33ec8adfb7cd69ac8e58e12a758a17fc8,2025-12-16,Merge pull request #161 from turnDeep/claude/debug-bondnet-training-YbU4x
+520d5a1e2d0863d2cd24bb50229399911075f7eb,2025-12-15,Add X11 rendering libraries and BonDNet dependencies
+97b837c745191f9206a71695a782755af3cc70d6,2025-12-16,Merge pull request #160 from turnDeep/claude/debug-bondnet-training-YbU4x
+49b4550cb158722fdd668ea22d513e028e946aa1,2025-12-15,Add openbabel-wheel as BonDNet dependency
+e62804605d4bcdbf53ccd7a7f9352ce314240ceb,2025-12-15,Add pymatgen as BonDNet dependency
+bc0adab075e5d95f79bfaab246ff04a60a6b80f8,2025-12-16,Merge pull request #159 from turnDeep/claude/debug-bondnet-training-YbU4x
+9a319fd51f768c58d4376ba116d03fd6d5e468f5,2025-12-15,Fix BonDNet training script to use existing train_bde_distributed.py
+afd672de5e35e8b36be1ab38df7f29cc514ff30f,2025-12-15,Merge pull request #158 from turnDeep/claude/fix-wsl2-config-wZVpo
+9267ed190150179904d43ff219b30a39a19ef9bb,2025-12-15,Fix WSL2 memory exhaustion during DGL CUDA build
+b5597b5b9436564fb49e1db77c0bcdc3a22ac3d6,2025-12-14,Enhance DGL build process for CUDA 12.8 support
+0c5cf082b25cefdf3f724f44f90c73bb4b0afbd6,2025-12-07,Merge pull request #155 from turnDeep/claude/fix-bondnet-training-01HmEjxVsvS9dFf6wnQ9yXZB
+f240a1f34dae44a59eed32e2ca8abdf58d79bdd6,2025-12-07,Fix DGL compatibility with PyTorch nightly for sm_120 support
+af6778462349bb5750e973d9ed98e6775aff44f2,2025-12-07,Merge pull request #154 from turnDeep/claude/fix-bondnet-training-01HmEjxVsvS9dFf6wnQ9yXZB
+ca171c5816da9eefe09471745ddc9c469f50e49b,2025-12-07,Add torchdata dependency for BonDNet training
+950e0aa78d9344f10736b01238ea5deae05ae724,2025-12-07,Merge pull request #153 from turnDeep/claude/add-bondnet-quickstart-01PM1AdULkk2FpSewvmzZvQW
+eb96e3460baa1e09b8e4d6391fc124e6b9aa69e6,2025-12-07,Fix DGL installation to ensure CUDA version is used
+c565edd416eb5005c92793866b60986803bc0c65,2025-12-07,Add DGL and BonDNet dependencies to Docker and installation guides
+a8465d6d3e03f609197d0c12d9a183e63a3be0e0,2025-12-07,Merge pull request #152 from turnDeep/claude/add-bondnet-quickstart-01PM1AdULkk2FpSewvmzZvQW
+a82b2425a5d31a8e0e42da71bbb1a4075e16a5e9,2025-12-07,Add Git LFS support to BDE-db2 download script
+5eaaf8a95bc5c6570f66c40aaf8910ffcaa6d396,2025-12-07,Merge pull request #151 from turnDeep/claude/add-bondnet-quickstart-01PM1AdULkk2FpSewvmzZvQW
+8b22995b5fb8b115fb32403068f00a290225511d,2025-12-07,Fix BDE-db2 download and training workflow errors
+8b6268de004261dba1e3f2614c61484f36202991,2025-12-07,Merge pull request #150 from turnDeep/claude/add-bondnet-quickstart-01PM1AdULkk2FpSewvmzZvQW
+34ba82ebbdec84f07cb9799302e6269c60a258bd,2025-12-07,Add BonDNet pre-trained model options to quickstart guides
+32d307aebaea4b3802547e75d96b5dbdbc3abdc5,2025-12-03,Merge pull request #149 from turnDeep/claude/review-config-differences-01FttGbkbvpAQa7encLwcrrR
+10cf9b6b9c08f0943e49ddfce6258c51346a683b,2025-12-03,Delete PR_DESCRIPTION.md
+369b80e7c065a2ed1139e7d3cac99ccde806dc58,2025-12-03,Delete docs/INSTALLATION.md
+4a0e39ae39126f8674c408fcf8d58af2809e86ea,2025-12-03,Update PR description with setup.py changes
+eebe17e3853da9c762f267f0a4f0ea0f3eeff347,2025-12-03,Update setup.py to v4.2 specification and add installation guide
+3e78fddc943e6429d6f8277d34fbec560a29bd70,2025-12-03,Delete PR_DESCRIPTION.md
+537dfd561f20c47172acf88a460ff1658122c7f1,2025-12-03,Merge pull request #148 from turnDeep/claude/review-config-differences-01FttGbkbvpAQa7encLwcrrR
+d1d5899f5ae0ad114e6904302d11946b7791c30a,2025-12-03,Add pull request description template
+ba6cdd8f0b425f17272090c68a717e1009cbffb6,2025-12-03,Add comprehensive config.yaml v4.2 changes documentation
+37629cda9cf1d175c85a6069d0abd9faacf9e4a0,2025-12-03,Update config.yaml to match v4.2 specification
+0d26f4d568dea9483c7608379873e4e6b748389c,2025-12-03,Merge pull request #147 from turnDeep/claude/review-config-differences-01FttGbkbvpAQa7encLwcrrR
+3e47bf9c8e15956737aece1895334628fdec9e35,2025-12-03,Add comprehensive NIST17 data structure documentation
+825f20e495e19b2bb71e59459eb2122dbc525240,2025-12-03,Fix NIST17 data loading: Add MOL file support for chemical structures
+9cf224094661fb61c15c7da8a0e3e97fd8c3dd83,2025-12-03,Remove v4.2 major changes from README
+54a1d5a322b652ac669f74979598a5d48c06e9dd,2025-12-03,Update project title in README.md
+9c20f4b9019a676fc6a8ec022138ff2094554071,2025-12-03,Merge pull request #146 from turnDeep/claude/review-config-differences-01FttGbkbvpAQa7encLwcrrR
+afdf156ecf15f4eb08e0bffc2372891ab29b12dc,2025-12-03,Phase 9 Complete: Finalize documentation and testing for v4.2
+e7edde2072873d4971f2ffbe232177bc00a0c1e3,2025-12-03,Phase 8 Complete: Implement Phase 5 inference process for v4.2
+7206764d589481411441b62211cc82325ece380d,2025-12-03,Add execute permissions to evaluation scripts
+0bbd38ddfec6b97d662942a83a6dc640741faa8d,2025-12-03,Phase 6 Complete: Implement Phase 3 evaluation for v4.2
+211666f2c7109c2818cf89a444f301cf73789d4a,2025-12-03,Merge pull request #145 from turnDeep/claude/rebuild-from-spec-v4.2-01MaEMhCuFuJmWyXK75NfLT7
+76b8a3080e5da1976e830455c5981e7e28a490dd,2025-12-03,Phase 5 Complete: Implement Phase 2 GNN model training for v4.2
+0207a4466bfe31f70db4b8a39ddaca4e51c397ce,2025-12-03,Phase 4 Complete: Implement Phase 1 data preparation for v4.2
+879e7989812029bb1bb5db879fc560097ab47419,2025-12-03,Phase 3 Complete: Implement Phase 0 BDE-db2 environment construction for v4.2
+d487c29136dc453a54759c29f1b025447171d515,2025-12-02,Remove obsolete requirements-phase0.txt (ALFABET/PCQM4Mv2 deleted in v4.0/v4.1)
+9e2cab6253cc8d2c66047612b23ad78534feecac,2025-12-02,Phase 1 Complete: Remove v2.0 Teacher-Student architecture files
+a90fae5dfefd951394c512ae2dd7fb25339d502f,2025-12-03,Merge pull request #144 from turnDeep/claude/rebuild-nextims-qc-gn2-01M45ckP2aVfMS3pic21L9kB
+8fb9ebb5667545f4cc1b55c9d76b4e648db03fc1,2025-12-02,Add Phase 5: Inference process to v4.2 specification
+d380a180d77be4c73d4cbc7461d45d5958feacd9,2025-12-02,Add specification v4.2 with minimal configuration approach
+589c49d6e8af9cea65712e7c1a7b03d6aa38f7e7,2025-12-02,Add specification v4.1 with comprehensive data filtering
+b91548f34e466c2f43dd5d0e47959d363f7f42fe,2025-12-02,Merge pull request #143 from turnDeep/claude/rebuild-nextims-qc-gn2-01M45ckP2aVfMS3pic21L9kB
+4b32dd223131c65bcd77e4eace91d59690e60218,2025-12-02,Add comprehensive specification v4.0 for QC-GN2oEI system
+b3d5f42c1fdfc4cca8ea76b02be189458b179239,2025-11-28,Merge pull request #141 from turnDeep/claude/fix-bde-precomputation-013cpvEB6W2tmeyB6kLCsTeH
+482ca2eb90997df6e6114ed0b337cc811bbc10f1,2025-11-28,Implement BDE-aware prediction for improved spectrum accuracy (v2.1)
+f607e2a316cf77d63e28ceb9465118609681765a,2025-11-28,Merge pull request #140 from turnDeep/claude/fix-bde-precomputation-013cpvEB6W2tmeyB6kLCsTeH
+83bd0425ffb16f3f6c0b8454b5a722b63559ff9f,2025-11-28,Migrate NExtIMS architecture from v2.0 to v2.1 (optimized multitask learning)
+448c1fe0c494364eefa3fe5f65ee47bdf1bf6dc4,2025-11-27,Complete migration from ALFABET to BonDNet for BDE pre-computation
+21deb773a1bf1fddcc429d37e9666316d0762a3d,2025-11-28,Merge pull request #139 from turnDeep/claude/fix-bde-precomputation-013cpvEB6W2tmeyB6kLCsTeH
+8fdbccc886808d363348b9522bef88651fc73a7c,2025-11-27,Fix ALFABET verbose parameter compatibility issue with TensorFlow 2.19+
+bd5c54d03aa8a0f85e5c8bf10561eda01121ea68,2025-11-28,Merge pull request #138 from turnDeep/claude/precompute-bde-pcqm4mv2-01W5Ny6x9NUJP169EZzxixy2
+a11ed93feaa83b419594637b050189bc69476b3f,2025-11-28,Delete KERAS3_FIX_README.md
+8f52adcf8006c920a8e6b1e654a946dc738425e7,2025-11-27,Update documentation with memory optimization notes
+fc32f6616c7b61536e8af8171990ec1358f55d3d,2025-11-27,Fix memory issues and SMILES extraction in BDE pre-computation
+116e43d1d588d49a58885ca7950b69b52781c5a8,2025-11-28,Merge pull request #137 from turnDeep/claude/precompute-bde-pcqm4mv2-01W5Ny6x9NUJP169EZzxixy2
+22c5dc4016bef916733416506365246eda6f42ff,2025-11-27,Add debug logging for PCQM4Mv2Dataset data structure
+041f63d55e4a5abbeb4ef22e786c2f5cb204c5c7,2025-11-28,Merge pull request #136 from turnDeep/claude/precompute-bde-pcqm4mv2-01W5Ny6x9NUJP169EZzxixy2
+379b137fa97d9761b49904ab532fc998ded4225b,2025-11-27,Fix SMILES extraction to handle tuple format from PCQM4Mv2Dataset
+cfaf7ad0a4f38fdbfc60619c0a082d48d89deeec,2025-11-28,Merge pull request #135 from turnDeep/claude/precompute-bde-pcqm4mv2-01W5Ny6x9NUJP169EZzxixy2
+2b9237d77f58cc7955f6939d6f7b86403b3ccac5,2025-11-27,Update README.md
+76ce835486675e14046e4375d7518a4819d2c867,2025-11-27,Fix PCQM4Mv2Dataset SMILES access
+5d06b3e477fe811002d19f4701b9e110e5593f5d,2025-11-27,Delete KERAS3_FIX_README.md
+4c131d475497aaf593c25ce42d0618b53c06e9a5,2025-11-27,Merge pull request #134 from turnDeep/claude/precompute-bde-pcqm4mv2-01W5Ny6x9NUJP169EZzxixy2
+543116222b4b9bd32b5f31b11b951e7e7470ebe8,2025-11-27,Add Keras 3 compatibility fix for ALFABET BDE prediction
+e446d2e1b64c1b8719f79ac7d1ebc14d654643b4,2025-11-27,Merge pull request #133 from turnDeep/claude/fix-tensorflow-dependency-01HWgRokMAauNZ78qEZRnMp9
+f139ad58ae0a5e8230eae6c05010b96bec819807,2025-11-27,Use --no-deps to install alfabet with compatible scikit-learn
+838cafb34366542561ff65a258f22a5cfeb88470,2025-11-27,Merge pull request #132 from turnDeep/claude/fix-tensorflow-dependency-01HWgRokMAauNZ78qEZRnMp9
+679fd2b8f77a937d711d55912d3cc93624221b9c,2025-11-27,Fix scikit-learn dependency conflict for Python 3.11 compatibility
+7c814906436c1086ec4a2b25c16554d427e64915,2025-11-27,Delete BDE_MODIFICATION_SUMMARY.md
+5c71548bb9e403788e855cdb3ae83449abad622b,2025-11-27,Delete test_bde_modifications.py
+d427f10f57d9aa80585bbe1abdb7e8f60ea9fa4c,2025-11-27,Merge pull request #131 from turnDeep/claude/compare-qc-gn2oms2-019jYGCpK9MEAorjdNP23vwe
+0d0e5f2ae4a586d2988b42f7fc614e485a52cc37,2025-11-27,"Update BDE values: aromatic rings 95→120 kcal/mol, improve cyclic bond handling"
+0f8aeb761ef94ef56201b813c31241ee00a052c2,2025-11-27,Merge pull request #130 from turnDeep/claude/update-markdown-docs-01QMXjFkNGtnDAHoXu5pgoPe
+8aae5017f26d671c76043a875bcc4d843d84301d,2025-11-26,Update and cleanup markdown documentation to match current NExtIMS v2.0 codebase
+a4c1026b9e1bb2b913b04e25d6083a7f2da33158,2025-11-27,Merge pull request #129 from turnDeep/claude/predict-bond-dissociation-energy-01PpVdkdyu56ECCpay24fQLB
+ae9311c7f0498cb880ec4d5da576c0b4870e98a4,2025-11-26,Implement Phase 0: BDE Pre-computation for RTX 5070 Ti (sm_120)
+b9fda7cfe991e97529c2f30f3b17cc0619898766,2025-11-26,Merge pull request #128 from turnDeep/claude/predict-bond-dissociation-energy-01PpVdkdyu56ECCpay24fQLB
+f0cdeb30b0fee4d619f7ab6b264bff84f9767e63,2025-11-26,Update README.md to document BDE Regression pretraining
+6a16f7d5bb1857ab749a39b646f7e0e1a6b576d1,2025-11-26,Complete Step 5: Update TeacherTrainer for BDE regression
+ec2a6a72bb2c8762201755670c366d516a0e9f02,2025-11-26,Implement BDE regression pretraining task (Strategy A)
+b43aa797b56d9f89d562320c205f02d49735c79b,2025-11-26,Merge pull request #127 from turnDeep/claude/fix-predict-script-0121Uhy6XvBui7bsqKpQ6zj9
+7a17184e0d3180dc3d5f3adea5616f218665f9a5,2025-11-25,Fix IndexError in find_top_peaks method
+180e4f9a3439489e57d51a6a47e4b970ce5965b8,2025-11-26,Merge pull request #126 from turnDeep/claude/fix-distillation-loss-01UgtyVu8M6cMDaYRKztsirF
+b9a080fe4412a626311e772286b4808af5746611,2025-11-25,Fix distillation loss explosion and training instability
+8f28503c6ad8196f7a6964b419c9fb6d48eba0af,2025-11-25,Merge pull request #125 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+d26a2aa7a4c8c8cb0b9312b9c142a5a2b159ccf8,2025-11-25,Delete PR_DESCRIPTION.md
+eda80e3f94f18cf6c482afa711a0418e51daf8d5,2025-11-25,Update PR description with comprehensive web research-based fixes
+eb10c31d1bfbeef992159b3ebd6255d19968655a,2025-11-24,Implement comprehensive training stability fixes based on research
+f314bd6c6381d1f038be5bf44c9d359216b823f4,2025-11-24,Delete PR_DESCRIPTION.md
+766cebb63aab59ec1770620dae050a111e1919fb,2025-11-24,Merge pull request #124 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+c39a8dbcba7cdd8164bf6ac2b2f3964c2edbf797,2025-11-24,Add comprehensive PR description for Phase 3 training pipeline fixes
+c26c8c050370107e40305bb524a5114b18920ae4,2025-11-24,Critical: Move NaN check BEFORE backward() to prevent weight corruption
+dcd824d5d9e9da0845c9a807f819210e24667102,2025-11-24,Fix Epoch 12 NaN cascade: Disable Mixed Precision and lower learning rates
+4c298c2357772c0f6c425e123ef6fa49ee711fa0,2025-11-24,Update config.yaml
+fc8a72eb8a25574f1afac07a89e8b073be929d95,2025-11-24,Merge pull request #123 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+83100b0f2f44c31efe6b2e7a99deb03b02bc8d51,2025-11-24,Fix Expert Collapse and gradient explosion (統合的修正)
+82967766c085e81ec522f6903aa0580c567f60cc,2025-11-24,Fix gradient explosion in Phase 3 training
+6b541217cd5ca0dde9bfd550ed767e48db1860c1,2025-11-24,Merge pull request #122 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+5417ce0fe708309775aadd3052426d08baba53a1,2025-11-24,Fix LDS module dtype mismatch for mixed precision training
+b8fef95694a0cb9409929d4697e3b41a7d46b8dd,2025-11-24,Merge pull request #121 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+91b199b385313d7273b2eeb7503a044cc4c9e041,2025-11-24,Fix Phase 3 knowledge distillation DataLoader architecture
+de99498c73189344d4812fc7895bd253e26c0e1d,2025-11-24,Merge pull request #120 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+7a7907f5cf5a6ad989d1a9b1f64268f19539100f,2025-11-24,Fix NIST dataset loading: Combine MSP spectrum data with MOL structure files
+f2d8d099b55a982c0bd2733264cc106d282f8424,2025-11-24,Merge pull request #119 from turnDeep/claude/debug-training-pipeline-012R4YCAS5axtTnXu8b1fnch
+27bc3011ba9eae016f4d166e2b3de5f5870c4ca6,2025-11-23,Fix Phase 2 NIST dataset loading error
+057dccf1548fbbdebcb700c73127aa3a0c7d47ef,2025-11-23,Merge pull request #118 from turnDeep/claude/fix-pcqm4m-dataset-016zroJsSabfrjYNe7kfEQwc
+3ebccaf300d36724dd96cbc5990ef30bdb228b0d,2025-11-23,Fix PCQM4Mv2 validation dataset loading and improve caching
+8b7f12ff5747ecb6c468388e84d9719b762aeb5c,2025-11-23,Merge pull request #117 from turnDeep/claude/review-training-progress-017XWmRZgT63e2Dv6tJrwVbp
+3a311ed452dce464ea0a1ac2cf3402c2533a40e1,2025-11-22,Improve pretraining: fix val loss calculation and add data validation
+5066aaf15224a9e1b5a0cabf4665827b68f3aac0,2025-11-22,Merge pull request #116 from turnDeep/claude/debug-error-fix-019ZnvjGEnUwAh5YKRqADcJA
+618724350af8ed8c3509e01752604fd044164654,2025-11-22,Fix edge_index dimension error for molecules with no bonds
+82731244c6d87c5e64cd8c137d0837d9f571b964,2025-11-22,Merge pull request #115 from turnDeep/claude/debug-error-fix-019ZnvjGEnUwAh5YKRqADcJA
+cf51b838d65524231013b22ccfc646307bd330d2,2025-11-22,Fix CUDA index out of bounds error in bond masking predictions
+a3b35a7a3d02b7e1b1ac2e0ceaeb7c2616b43b93,2025-11-22,Merge pull request #114 from turnDeep/claude/fix-error-handling-016YP9YaP8xPbX3bpBkxqmhS
+c4264230c0112d66af26fe95e837983feb489604,2025-11-22,Use only_smiles=True to bypass OGB graph conversion errors
+2d6e9448b8f08acc50f18592792f0705412a1c8d,2025-11-22,Merge pull request #113 from turnDeep/claude/fix-error-handling-016YP9YaP8xPbX3bpBkxqmhS
+bca47a9391931135bd86db6189ba2963ba7af0c6,2025-11-22,Add invalid SMILES handling to dataset module
+8d1558651cf9d25437c4f8764fe502888094be85,2025-11-22,Merge pull request #112 from turnDeep/claude/fix-error-handling-016YP9YaP8xPbX3bpBkxqmhS
+da15c1617969ad4013d79bc0dfd606bceab6e9b0,2025-11-22,Fix PCQM4Mv2 download error handling for invalid SMILES
+ba62254e12028522759619400a472ec2021fe8b0,2025-11-22,Merge pull request #111 from turnDeep/claude/add-ogb-pcqm4mv2-setup-01Pp3HCHBUjUi9hT6MRfxBm6
+02f19a77e390f3b36be706addc7a34617913a947,2025-11-22,Add OGB library and PCQM4Mv2 dataset setup
+2d11ee88bffe75bba0ed2743fac44938d43b2e7c,2025-11-22,Add files via upload
+80db74e02903676c01e2745a58c78967f30abd17,2025-11-22,Merge pull request #110 from turnDeep/claude/debug-training-pipeline-01YCjVQKzwwDDj1hLxgTBXeU
+ac441d795abae45ad1fbefe512130413af043e0f,2025-11-22,Fix case-sensitive filename issue for NIST data
+cfddea24095ef2f5083af124b1b6b44aeb7c354e,2025-11-22,Merge pull request #109 from turnDeep/claude/investigate-pipeline-warnings-01W4aZNU4brwPPdXh4Zk8tgZ
+ff0390f5ea22876be6695536ef55b4486cf19870,2025-11-22,Fix RDKit deprecation warnings by migrating to MorganGenerator API
+7d945f378b5e351a23b98eab5b15505735bdb6dc,2025-11-22,Merge pull request #108 from turnDeep/claude/integrate-torch-scatter-01FZxWxEEegUULgxbmTcuHm8
+8a1412ae1d775b49697f202874b200cafa7a7f71,2025-11-22,Update torch.amp API for PyTorch 2.10.0 compatibility
+2212e72ccde0c2520dfdfdc0294394c93a50b51c,2025-11-22,Fix edge dimension mismatch in BondBreakingAttention
+4d224635a3f8904f0e3946943d571c9ab8c21102,2025-11-22,Merge pull request #105 from turnDeep/claude/integrate-torch-scatter-01FZxWxEEegUULgxbmTcuHm8
+70e008f4a5b2e217103de833251ba9ad0914b3e7,2025-11-22,Simplify torch_scatter build to always use source compilation
+8d693e8d985a77a20fc5731cd9d4534408d670f7,2025-11-22,Fix torch_scatter CUDA support for sm_120 (RTX 5070 Ti)
+e8ca6bf71d024cf478447263518d9486b2b1ca2d,2025-11-22,Update README.md
+ff3cd1fa337c4bbb5d9e3eb8780b034609d1d0cc,2025-11-22,Fix typo in README description
+860f649f9f54ad2cc57c177b071f38dda4a70339,2025-11-22,Merge pull request #104 from turnDeep/claude/fix-dev-container-0137EEMTNirDFkv113Az8nDB
+6d18a578053a18cc1bcf948383160101ef6d52fe,2025-11-22,Fix dev container permission error for pip install
+04e7b7f01a0239ef9ab69842a5a329b09bf650f0,2025-11-22,Merge pull request #103 from turnDeep/claude/fix-docker-build-error-01Cy9KZXJkBDWGmxUS4YtTUT
+9e59a172c8dbb7d2f51524f945088c893542d3b0,2025-11-22,Fix Docker build error by pre-installing nvidia-nvshmem-cu12
+888a160bf3b7d6c4456672177700eae0a2ae46e8,2025-11-22,Merge pull request #102 from turnDeep/claude/debug-error-investigation-016qFajkhzPZaDgsQBRZWACK
+4e8dc55d8e80ce1af03124aee3dce3f697dc83e2,2025-11-22,Fix torch_scatter CUDA support for RTX 5070ti (sm_120)
+07e4f98cf6c2579c0df309a26b1341176d53b08e,2025-11-22,Delete test_memory_efficient.py
+9c53b4f817efa7dca75927782e1b9cb2d56c711b,2025-11-22,Delete test_standard_mode.py
+638fdefd64b8353cf7e0bddaf424a6b84b8c9d62,2025-11-22,Merge pull request #101 from turnDeep/claude/fix-training-pipeline-error-01C7BR4vRa21pbS6SxTWN2rV
+ea53918d8008611218e437e98df652e2c3b919db,2025-11-22,Implement Memory Efficient Mode with HDF5 lazy loading
+b94b153ebd42b69a29b17bd54db9da5021abe180,2025-11-22,Fix 6 critical issues: Enable all configured features
+148484f0adce04faa15b48de59118e1654df6b86,2025-11-22,Merge pull request #100 from turnDeep/claude/fix-training-pipeline-error-01C7BR4vRa21pbS6SxTWN2rV
+6c383c9ce9aad4a6e2169bbb6ac76413de234482,2025-11-22,Implement bond masking pretraining for Teacher model
+9a036e6059a326c301e2097b05de23fe5b9802ec,2025-11-22,Merge pull request #99 from turnDeep/claude/fix-training-pipeline-error-01C7BR4vRa21pbS6SxTWN2rV
+830f387ac254e802243a916dda121a787d67607b,2025-11-22,Fix KeyError: 'spectrum' in teacher pretraining phase
+67c1dd876169dbc3d77904a229937c526cb04721,2025-11-22,Merge pull request #98 from turnDeep/claude/fix-training-pipeline-error-013jXt7gL2TvJmFsJpDpcon2
+903562543139d6ca68267ff18d892cef3b363588,2025-11-22,Fix KeyError: 'pretraining' in teacher_trainer.py
+4807df0568a9d2db0a7742b0535cafe32495cafc,2025-11-22,Add files via upload
+43f4c42c4b4dc447d51a920683998fdd7b31818a,2025-11-22,Delete src
+007f813e797622a79b59b06907c706ce62d03a2b,2025-11-22,Delete scripts
+35264b24e727b45d808afcd6b30c2dff88cb0594,2025-11-22,Add files via upload
+682383d22b8d3bd9b3b8bf0c8114e5abfe602c8d,2025-11-22,Delete install_torch_scatter_cuda.sh
+8281e16f5472c9a8c5b1121ccaf83bfa93343cb1,2025-11-22,Delete requirements.txt
+b2c3900cb02c4f3e555eabccb2fa0d4e745fe54f,2025-11-22,Delete run_gpu_optimized.sh
+4df48937e9db7f3af02912fc154e15dfa7c89f4c,2025-11-22,Delete fix_torch_scatter.sh
+0e7ada670c11cd00c1784c57ea749c2e7750606c,2025-11-22,Delete config_pretrain.yaml
+18c18f58dc965044c7f0f6b861214d6bcc97f3a7,2025-11-22,Delete config_gpu_optimized.yaml
+1b4ab2d92df280785c0896ea7f038598915cbd29,2025-11-22,Delete src directory
+dd44c2d6f6fe966d8f0359ac85fc5b25095c69e4,2025-11-22,Delete scripts directory
+e74d35b0a807f7f0955ef5d673cb4016163b49c6,2025-11-22,Merge pull request #96 from turnDeep/fix-torch-scatter-check
+690038547507a47fe6452bb6d91792890818ff71,2025-11-21,Add environment check for torch-scatter CUDA support in training pipeline
+601d19c956ac21b0353bb8ad5d0a693cc05abac7,2025-11-22,Delete FIX_TORCH_SCATTER_CUDA.md
+aa14753d5851ab000feb0085cf430f50636ee6d9,2025-11-22,Merge pull request #94 from turnDeep/claude/debug-error-fix-019K8vE2ZPMsdZvZXoj2CWhw
+fc58a052d94e5737278cbf1056ec6e73d4bc38be,2025-11-21,Add torch_scatter CUDA installation fix script and documentation
+91d452f813f73dcc8cefe62a8f791ea0bc2e6e4b,2025-11-21,Merge pull request #93 from turnDeep/claude/debug-error-fix-019K8vE2ZPMsdZvZXoj2CWhw
+47987ef9c4e5a38bcac63d10a26acac26e78eba1,2025-11-21,Fix torch_scatter CUDA error with runtime fallback
+7a41ae81d012a1a68f2af12c136a1898ab58b0a5,2025-11-21,Merge pull request #92 from turnDeep/claude/fix-error-01BmTQPZsBWiCUfRbxYJ5PRt
+509831448f2376b71337bf4a4973e19331f896f8,2025-11-21,Fix torch_scatter CUDA error with native PyTorch fallback
+516680ac8b8734787cb96bca078b6cac1e77ec79,2025-11-21,Delete INSTALL_CUDA.md
+782df9c939e4d0505a992b9a4174fbfeaa1f5d70,2025-11-21,Delete FIX_TORCH_SCATTER.md
+2b96340725482a82c164300b241a2a73db7af736,2025-11-21,Merge pull request #91 from turnDeep/claude/fix-torch-scatter-gpu-01MtK48D1MCRSHMJ8Yb5T6bY
+43585c34198a4005172cd7b637afb18653814b5d,2025-11-21,Fix torch_scatter CUDA support and add GPU optimization
+37532470e6e8b08d9f1cbb7d9f7d00fc4e1cd418,2025-11-21,Merge pull request #90 from turnDeep/claude/debug-error-fix-01Abfrpah1Ne34WKSxpeGNtC
+5431552d81537cc9e529b6c59864e505b22dd7c3,2025-11-21,Fix KeyError 'spectrum' in PCQM4Mv2 pretraining dataset
+76c8f7f50087fa3816ac355d72ff3040a56254fc,2025-11-21,Merge pull request #89 from turnDeep/claude/debug-error-fix-01HWHDwWBowfobs4nNYC2xUu
+7b897a76ff0751c3f411e4e0c5a4d32ba2a69a50,2025-11-21,Fix config structure reference in teacher_trainer.py
+5f262b4e21124f78b8d1ed70508d51f26cb9aa6b,2025-11-21,Merge pull request #87 from turnDeep/claude/fix-train-pipeline-error-01DA4RFbZ2zUuSbPKdfd4TXG
+b8338bcfc95aa36577c11a99cd1cee52769618ec,2025-11-21,Fix config structure in config_pretrain.yaml
+d3cf7862bb479f31859a4f1a8bb72e39bac0b58d,2025-11-21,Merge pull request #86 from turnDeep/claude/fix-train-pipeline-error-012QPQiqhGMdN44UzoMQKVpf
+a8d9b7decbbb99410424772d05bd5e175b688aff,2025-11-21,Fix config structure in config_pretrain.yaml
+e34e5a1f3004286e66bcc01bb5cab3ff98ff1a48,2025-11-21,Merge pull request #85 from turnDeep/claude/debug-error-fix-01Ss4T5EiS1aFcmrjyKWnjWK
+3b134bca89af5c6b0c7f6e8771e2654bd7c77948,2025-11-21,Fix ModuleNotFoundError by adding project root to sys.path in all training scripts
+7ff7ad413b89d4d570df95c6eb8981a4becfdc6c,2025-11-21,Update README.md
+920d371bd3dd9026f8653f1a3a4727854df01887,2025-11-21,Delete tests directory
+4e565eecd979839c2a082922a176c391b2edb013,2025-11-21,Merge pull request #84 from turnDeep/claude/optimize-nist17-memory-01RXqHMSa6zqScesaQjfzvEL
+9430b3ddee20b71021ec8461f56e8316cd825493,2025-11-21,Implement memory-efficient lazy loading for NIST17 full dataset (300k compounds)
+e7ef3ba55b621eee309725661b801b4611475881,2025-11-21,Merge pull request #83 from turnDeep/neims-v2-compliance-fix
+ccc9ac1933225f784122b0904b6deb8d9732b358,2025-11-21,Implement BidirectionalModule and Fix GradNorm
+6783da8bae62905b42592725dbc9a1c71c6ca83e,2025-11-21,Merge pull request #82 from turnDeep/claude/update-bitspec-neims-01Me8g8VpKBTcFUscJKe4du3
+78f773733dc6fba7350fb1872bdd9c8e27287b62,2025-11-20,Update README.md with complete dataset integration documentation
+8864016a423d663537b52896d0222d8dfd86c18c,2025-11-20,Implement complete NEIMS v2.0 dataset and training integration
+36aab37e06e0f5fdbc21edd2ed38558d248dcb8d,2025-11-20,"Add NEIMS v2.0 trainers, scripts, and evaluation"
+3f44d77e614a17a3a26d91327d7623d71013a249,2025-11-20,Implement NEIMS v2.0 core architecture
+bf65a3671d8c01e5b7491795e1fd55b601338be8,2025-11-21,Merge pull request #81 from turnDeep/claude/update-bitspec-neims-01Me8g8VpKBTcFUscJKe4du3
+1fdae4909ec91a43b150b6d7fc4ea5aafcc75528,2025-11-20,Update BitSpec to NEIMS v2.0 specification
+7ef6a3e1283cf28ea48f47e6c35e0f41189b30b0,2025-11-21,Merge pull request #80 from turnDeep/claude/neims-model-research-01FixwNWH3kjbvfM5g42674t
+991657f6fa197da16d28fb6e0efb195b5f13d65e,2025-11-20,Add comprehensive NEIMS v2.0 system specification
+318079a2d6e610fa4f8f180840e8b63b23d5e87b,2025-11-20,Merge pull request #79 from turnDeep/claude/analyze-logic-ms-research-01Hy7CUFbrPpdyDrH3qzB4Zd
+d5b4fbb89342e464a0651da0a0cd437486b0c15d,2025-11-20,Performance improvements: Data parallelization and EMA
+36379e83cb940f22466b34512dd2116ef5eef490,2025-11-20,Refactor: Remove dead code and rename loss function
+1b44e1024e183315b326c29aa0943f5f2c4b88d0,2025-11-18,Merge pull request #78 from turnDeep/claude/verify-similarity-metric-01PKRCMYaV13be8Q2LHFzmZW
+595e46bd2e86554313128b5f4fa7baec99e395fd,2025-11-18,Add functional group features to GCN model for EI-MS prediction
+d8f43a41a0f4a6c38822403fa03d2c3803f6211e,2025-11-18,Merge pull request #77 from turnDeep/claude/fix-finetuning-cache-014wA2woFKauVfqaQwqSkwJy
+63eeadb50ef48eb3374bdc55bf05b04584ba2849,2025-11-18,Fix finetuning cache issue and add random sampling feature
+885a90e5ffac2cb9501719f1757f848fc52041c4,2025-11-16,Merge pull request #76 from turnDeep/claude/fix-error-01JT53ZdsjDQDhDKxkj1Amkk
+4cfc5763f364822c67ad88a860072331d74f9105,2025-11-16,Fix ReduceLROnPlateau compatibility with PyTorch 2.9.1
+d176d63504eb1dae68137a0e58a6db8df8d0c4b8,2025-11-16,Add files via upload
+592b6a0720ff8d1d1bda3d858546212ee90d45f2,2025-11-16,Delete verify_imports.py
+26004f6accd9b60824e42139b8ac50dac246c9cc,2025-11-16,Delete config_pretrain.yaml
+b0e3985fe13b4caa167c6d85b1febbc8a9264117,2025-11-16,Delete clean_cache.sh
+8101d3b52f2fb71c2809214a8cae3bfc18a577fd,2025-11-16,Delete clean_cache.py
+c15c05aeb3b2b3b7b11eabc6e7f0e6e719fb2dcf,2025-11-16,Add files via upload
+c515009d5eabc0eb30dc60e1e6dd5a198bff1728,2025-11-16,Delete src directory
+e36850e4577a4b0cfa2675336545eee0ddf99742,2025-11-16,Add files via upload
+b110b75f184e7d3d3ffd0df8c9b63733c76e73bd,2025-11-16,Delete scripts directory
+de1a36086647c81238a0709d3af201b651fe22e0,2025-11-16,"Revert ""Delete verify_imports.py"""
+3604947d2039e9aba294b0153887b0744b12ce56,2025-11-16,Delete verify_imports.py
+9b42cec8668597ce0340e6f1aec2d0b427b47a84,2025-11-16,Merge pull request #74 from turnDeep/claude/debug-error-fix-012Sj4V6AYYC4Po1Vkfi1tKq
+9c6bb7638535a1efdb969c7ee177c9bf856bec03,2025-11-16,Fix circular import error in src/data module
+333211c97f19f86aede5da0bbed0db9da89907ef,2025-11-16,Delete MEMORY_OPTIMIZATION.md
+456b7cd287b08efeb202c5a0d683b502e9893156,2025-11-16,Delete IMPORT_FIX_README.md
+080395d2e1ed1636ab8cc1e80b756bac66371984,2025-11-16,Delete FINETUNING_OPTIMIZATION.md
+cbc3beacca90dbee03653a9fdacdfadd09bf52f5,2025-11-16,Merge pull request #73 from turnDeep/claude/debug-error-fix-01SAZVDPDXEeT1bD3zCZnBQv
+2e21954187f8fe83d55979d4c93541d5dcd87cfe,2025-11-16,Add tools to fix circular import error
+a4ac5d73b968633e6c9bedb2bfcda76420e3666a,2025-11-16,Merge pull request #72 from turnDeep/claude/debug-error-fix-01K552eDTsQQJNeJQjngxngP
+fbba0071f4b2f24b6941061021e80a737623ff00,2025-11-16,Fix circular import error by removing wildcard imports in src/__init__.py
+76b755f6a22d096a88e167be8a1c63924da750f3,2025-11-16,Merge pull request #71 from turnDeep/claude/debug-error-fix-01Ej3GAXswYfsYCaEcFqUyFj
+4b5b0dffb615d93bf5815537b830888924452eea,2025-11-16,Fix circular import errors by adding missing __init__.py files
+1ce6e7f94f984ea75b2342564022f1319cc150f0,2025-11-16,Merge pull request #70 from turnDeep/claude/cosine-similarity-finetuning-01HdwuvwmFYkJyzMMJje71Bb
+2b2de6919ca14e2d8116b286362ad3954f43b5e5,2025-11-16,Replace MSE Loss with Cosine Similarity Loss for EI-MS finetuning
+66abc3b01e2ac8dbd4411fa45f7ec9ad9accf636,2025-11-16,Merge pull request #69 from turnDeep/claude/substructure-featurizer-loss-01R86zjV6myRD9grH8gm9akh
+fef35c909d34f46932dbcdbb4c25fd9fa3ab1665,2025-11-16,Integrate SubstructureFeaturizer and replace Modified Cosine Loss
+4503414193173c76a8931c12e66f3838e276f0f4,2025-11-16,Merge pull request #68 from turnDeep/claude/fix-finetuning-memory-01XUt6HAP1VYEXt1okhX6zyu
+70a0112e262eefddf076b571c8882361481baa99,2025-11-16,Fix finetuning memory consumption with comprehensive optimizations
+ed8238b7f95b390dfb0367c2cc25161cf39176c1,2025-11-16,Merge pull request #67 from turnDeep/claude/debug-error-fix-01KtQa13uqh3ngDg25QKmWdn
+20acc829203306281754da082458953075e8d624,2025-11-16,Fix ReduceLROnPlateau compatibility with PyTorch 2.9.0
+3255ecc870d700b046c6cf5fea63021c10639e78,2025-11-14,Merge pull request #66 from turnDeep/claude/optimize-finetuning-performance-011CV5KRx3PNYHGDaTnsxqgq
+f0944763601130c7ef6ade46482cdc889f882417,2025-11-13,Optimize finetuning performance with 2025 best practices
+c5e0c55c6e55093e109ca32d5481bd2d44b14ab1,2025-11-13,Merge pull request #65 from turnDeep/claude/finetune-matched-samples-011CV57xcNvK75Ss3ck8XtF3
+1db77d845873ad29fa50a55b15dc3d78261f00b2,2025-11-13,Add --rebuild-cache option to finetune script
+441f132beba019fd8e63de03b5613b51552a9af0,2025-11-13,Merge pull request #64 from turnDeep/claude/debug-error-investigation-011CV552ASDhRxYfGrNEwR5d
+b161cc41876bb77ecc154d5b2231c98edc789b27,2025-11-13,Disable wandb in finetuning configuration to fix authentication prompt
+810e69597d81db3c50d052d964e2c17e8b72b9c6,2025-11-10,Delete test_edge_integration.py
+465cc3db41a8e15985bae5de1ec94eadec3095f7,2025-11-10,Delete EDGE_INTEGRATION_COMPATIBILITY.md
+496295a2c9a5d5c0564a3cd332d75f6091e2be43,2025-11-10,Merge pull request #63 from turnDeep/claude/gcn-homo-lumo-bonds-011CUyKFheu4msmWLPJwXh3N
+18484eb21fcafef25b0e517d57a330e03514846c,2025-11-10,Add compatibility documentation for edge integration feature
+4b2849e4327c1da59347ebed1026b5280101d4b2,2025-11-10,Integrate edge embeddings into node features for GCN model
+0ed52a45c31a4da15526bb1be7c7d39c03920e30,2025-11-09,Merge pull request #62 from turnDeep/claude/fix-dev-container-freeze-011CUxSMPSkGiV9GByvVUUH1
+c6316c671a9a32ed273c9a5b9be84153eed0548c,2025-11-09,Fix: Prevent VSCode from watching/indexing mol files to avoid container freeze
+c5f52cca39ba85dfa533a7286850290880953d5b,2025-11-09,Merge pull request #61 from turnDeep/claude/finetune-mol-compounds-011CUwsHQBCTykuKwndqzZws
+1635d4188b4d856c66a443efdd8051f89bedd931,2025-11-09,Optimize finetuning config for 300k compounds on RTX 5070 Ti 16GB
+e4c5a97238debefca9f84ff850465ba5208fa28d,2025-11-09,Merge pull request #60 from turnDeep/claude/fix-relative-intensity-normalization-011CUwqxYhmcXKzpsPQCFxrc
+0dc293adbdc7e3cda9d81a879abd6c7cc7c6641e,2025-11-09,Fix: Normalize predicted spectrum to relative intensity (max = 1.0)
+98011321e1649aaafb71eed38517ff04f3d7c3c0,2025-11-09,Merge pull request #59 from turnDeep/claude/debug-error-investigation-011CUwqCm8AGo58ppCjs9FHy
+51c5fe7af396379c35bfa4c2688101208e5dfa5b,2025-11-09,Fix: Suppress warnings in predict.py and update PyTorch API usage
+c27f2e523e822fed0298c1764aace60589a0f446,2025-11-09,Merge pull request #58 from turnDeep/claude/debug-error-investigation-011CUwpoDu4XaoutQTfS11Vd
+c4b2ce3193ef5257dc0f52068cebf2adfa8f0013,2025-11-09,Fix: Suppress warnings in predict.py and update PyTorch API usage
+ae5c80050495138817ac6c3b9cfb1b3acd7a0970,2025-11-09,Merge pull request #57 from turnDeep/claude/fix-peak-index-bounds-011CUwp1LCYAGR6QX6a9iDAC
+6d6524dc5749c1864c12c736fd14a2e638db05a2,2025-11-09,Fix: Correct peak index bounds error in find_significant_peaks
+dcb4994b291f173f28038e95845f9e6a9790d32d,2025-11-09,Merge pull request #56 from turnDeep/claude/fix-error-011CUwoZkYXz3hcCanKTo9i8
+1f711df224999a313007c97ff71de24888e7abc1,2025-11-09,Fix: Handle spectrum array dimensions in predict.py
+37c071e4c461cd8bb7c26d2bf4c21ca11c8d6225,2025-11-09,Merge pull request #55 from turnDeep/claude/debug-error-investigation-011CUwo3ixT8MtaWZDdKcqna
+360e8b627926933da6c130c1a3b807d7673358a3,2025-11-09,Fix: Add pooling parameter to model initialization in predict.py
+cfd4fbd434767b8fec0b8f7bd4f228c3bd62f3e4,2025-11-09,Merge pull request #54 from turnDeep/claude/debug-error-investigation-011CUwne7nxRxKqewvd6jyvt
+11775feaf4ddd402e64a1b93bb27302b02ce3c8d,2025-11-09,Fix: Update config.yaml to match checkpoint feature dimensions
+8ec890af440e51c1f9f7fa128b67aaee0de897b8,2025-11-09,Merge pull request #53 from turnDeep/claude/fix-torch-load-weights-only-011CUwkcGAiHFZapwHswNbkF
+41212f6f96de2a38efe3138f1927dc944b407203,2025-11-09,Fix: Add weights_only=False to torch.load calls for PyTorch 2.6+ compatibility
+0717918b98a8199be6c14f031dbd84f1da760ddf,2025-11-09,Merge pull request #52 from turnDeep/claude/debug-error-investigation-011CUwjnBKv5ch7z4tB5mhMX
+0b67b747d58ca943192dffdfc2fc7d854ab23618,2025-11-09,Merge pull request #51 from turnDeep/claude/fix-checkpoint-loading-error-011CUwk2aZHuJQcEb1ZuFGZc
+84486074bd3c1af2d1f68bd3899474c5e753b585,2025-11-09,Fix: Improve checkpoint loading in predict.py with auto-detection
+6cedd8eb50d7a494575a46fa631f2ecc605852ae,2025-11-09,Fix: Remove invalid YAML syntax in config.yaml
+fc68b2257de1fb92f6b40918c743689fcd41bee8,2025-11-09,Merge pull request #50 from turnDeep/claude/debug-error-investigation-011CUwjEHxd73ZoXmg5BLttt
+16ed2b2adc27415b9b1518861b6631561b1d81d8,2025-11-09,Fix: Correct import path and method name in predict.py
+b59134a98c4dd961f759dd27304bb6c502a8ae42,2025-11-09,Merge pull request #49 from turnDeep/claude/fix-error-011CUwiaa4w7BiuBGDpWgHoX
+7f10de4414b232618a2bb88f1f3af2a3a96346a9,2025-11-09,Fix: Correct import and class name in predict.py
+bcac9f640ac60d2fd16c39356c60e00147f60ed6,2025-11-08,Merge pull request #48 from turnDeep/claude/fix-error-after-correction-011CUvQ7UzjWLskQotf2vei2
+9532c78b6505ab7b8cf74aef16cada9b7cc2ed1e,2025-11-08,Fix: Disable Oh My Zsh installation to resolve network error
+8690a5367c05d91676876a3ff16728cd6f6f9d02,2025-11-08,Merge pull request #47 from turnDeep/claude/fix-persistent-issue-011CUvKaVrFfGbyBx1iprPwL
+725608cb54fc41abf541d5ee638eb3be0e988d89,2025-11-08,Fix: Resolve RDKit ImportError for libXrender.so.1 in headless environments
+cc77a22f4f7353a583fe214253d7ce93b57b6955,2025-11-08,Merge pull request #46 from turnDeep/claude/fix-prediction-error-011CUvK4YWQX1jPU1hpJCLk5
+514785fe6307e87449ca46b9f3d08781295978a0,2025-11-08,Fix: Resolve ImportError for libXrender.so.1 in headless environments
+20d684b383d583fd7a9afe6e50d47f2733107777,2025-11-08,Merge pull request #45 from turnDeep/claude/fine-tune-pretraining-011CUvFw4PgLnrMPHzmGhqJP
+ff800eb1ab646858cf9c5b32249750e5eda5fc78,2025-11-08,Fix: Correct MolecularFeaturizer node feature dimension to 48
+e14b267c8a16858ffa21c1c3c5f9b0d8e4c8b12c,2025-11-06,Merge pull request #44 from turnDeep/claude/fix-batch-size-mismatch-011CUq1Wz4QynHRSADUuR7tC
+ade89cd24b6303a31d5812ab55c8aa6e6dcc506e,2025-11-05,Fix: Resolve batch size mismatch between predictions and targets
+ceaf5f8bb1a8b0f0eb9cfedfd2670e7db8110744,2025-11-05,Merge pull request #43 from turnDeep/claude/fix-tensor-shape-mismatch-011CUpkywb6KTm9HFmTeqQb2
+9c7b8742c68dc1f39e3f98c01a033838a12324d4,2025-11-05,Fix: Resolve tensor shape mismatch in NaN/Inf filtering
+092022de9ee6e1a3717d6a6e7060019cc69baa5b,2025-11-04,Merge pull request #42 from turnDeep/claude/debug-http-500-pretraining-011CUo2bD2zA5xYE4qnk6Y58
+900aa4ff345e7d8b40f23271ee11dba0dfd4fb9a,2025-11-04,Fix: Resolve HTTP 500 error during pretraining epoch 2+
+7a181d9b2534367ff342f658af1ec2519e52c18c,2025-11-03,Update devcontainer.json
+cf1ceadec49dadfae9458e410ff458b7e5ded52a,2025-11-03,Update config_pretrain.yaml
+cd84643f30ac18ebd6465b94385ace614a080f2e,2025-11-03,Merge pull request #41 from turnDeep/claude/pretraining-check-011CUkcLmepnBUPqg87tEEko
+a81a1ffb4e377a819e7f738eadf9b293356b3269,2025-11-03,Optimize: Improve dataloader performance for GPU utilization
+07bb9ef367bbe8cb1ff7609bbe0dee8ed916fb44,2025-11-03,Merge pull request #40 from turnDeep/claude/debug-resource-error-011CUkSMeGSShmJho7RhfScp
+5867e0a932fefffcc0d55509e02df2ac44fa290e,2025-11-03,Fix: Resolve dtype mismatch error in PCQM4Mv2 data loader for Mixed Precision training
+1d2a270a368e847abad4f07bce7359936789d80d,2025-11-03,Merge pull request #39 from turnDeep/claude/debug-resource-error-011CUkRSGdCq6RGgbwwFGZA2
+0fc3c0cdb3fcc1384053f74ff4431d2b6556557b,2025-11-03,Fix: Handle float targets in PCQM4Mv2 dataloader
+e5ff119e681d84051e7f52ebc6dbf5a2ad60ffa9,2025-11-03,Merge pull request #38 from turnDeep/claude/debug-previous-solution-011CUkPkvG9erv5PiN8pWC9c
+6573db5be45716b53b285d15a000405898900f95,2025-11-03,"Fix: Resolve training freeze at Epoch 1, 0% progress"
+e489663f2dab7892eaf675634af94cfb9a66d103,2025-11-03,Merge pull request #37 from turnDeep/claude/debug-epoch-progress-011CUkPBqu3rbgcbTTpWDfgn
+e50cde9cbed7ae5c5cb2167b34a103989d2c8513,2025-11-03,Fix: Disable torch.compile to resolve epoch progress freeze
+2cfdaec30e138bff7f845453ad895e52cb412430,2025-11-03,Merge pull request #36 from turnDeep/claude/debug-gpu-underutilization-011CUkNUbKJwdqUfPnmtB2L1
+67aa4c8501bd8fed31b54975f12e8586907bf3b3,2025-11-03,Optimize data loading to fix GPU underutilization
+ef615d3447f421fca4f498bb9e631c2dfc1a89e0,2025-11-03,Merge pull request #35 from turnDeep/claude/investigate-low-gpu-usage-011CUkMnfQkZx3X9ay5urfXG
+fa4d45e70efb1c2a7b5877e14f07813630ecfa05,2025-11-03,Optimize GPU utilization: Fix CPU bottlenecks and increase batch size
+94479a9cf537dcc9aeb341e1a000454e4fde66d1,2025-11-03,Merge pull request #34 from turnDeep/claude/optimize-gpu-training-performance-011CUkMDgHgDyMSrgFQ6gJYa
+5537049a7518161fd02daee45228f754ebfb6949,2025-11-03,Optimize GPU training performance for RTX 5070 Ti
+cf7633b84e8d88317260c38e3d5ffc04ce7a1681,2025-11-03,Merge pull request #33 from turnDeep/claude/fix-pcqm4mv2-split-error-011CUkLnLe32F7N8jQW3b5dc
+f2f7da16c17adc35706b2845123f39a1ac191704,2025-11-03,Fix PCQM4Mv2 split parameter: change 'valid' to 'val'
+b6ddcd1417e42a4c254c1f0370841ad59e05ce29,2025-11-03,Merge pull request #32 from turnDeep/claude/debug-error-investigation-011CUkJYWWEbqVVruA48axXD
+3eee66826851efe0985b30ee1ae0b3c84f83097b,2025-11-03,Fix YAML syntax error: replace Python triple-quote comment with proper YAML comment
+8674d826bb5e0022a41c3ac0a266fb7de5e58b28,2025-11-03,Merge pull request #31 from turnDeep/claude/fix-error-011CUkJJpPsKyGTdxzqxPTEV
+c5ddfd5b01b907fd15415c428d47ff5e358c7203,2025-11-03,Fix ImportError: add setup_rtx50_compatibility function to rtx50_compat.py
+63750a1f5e820f5645a068dd3a616c501cd2b445,2025-11-03,Merge pull request #30 from turnDeep/claude/fix-error-011CUkJ876ASEj7ACi2CGhVY
+bf2cc0b8c3a3dff3ff51a17a23d8f346bfc6e2e1,2025-11-03,Fix ModuleNotFoundError by commenting out missing module imports
+c3a609280a8d474ab47099bdd289ee0d7a844029,2025-11-03,Delete TECHNICAL_SUMMARY.md
+a55dd5c241787e1d4646b96e1267dcf1815f9840,2025-11-03,Delete QUICK_REFERENCE.md
+feda8c2e36de6201431e36498382e032b99a88f5,2025-11-03,Delete PRETRAINING_PROPOSAL.md
+025b07fc3f27cd83172a2e5678ed08fc05afbcbe,2025-11-03,Delete DEV_CONTAINER_GUIDE.md
+fe7bd034c04f2463c88bcd13b0b1a50cc0fa286e,2025-11-03,Delete ANALYSIS_PRETRAINING_INFRASTRUCTURE.md
+e9f422d0a0a881ff7678316eb544c6185928cffb,2025-11-03,Delete ANALYSIS_INDEX.md
+ee54e103743741aeaae85206ba3f284ebd9c908b,2025-11-02,Merge pull request #29 from turnDeep/claude/pcqm4mv2-readme-setup-011CUishZJzGiwiQ63or1tjG
+0cd7214bb1bb160d9ae63ccd16d5e7a63d1a758d,2025-11-02,Add integrated training pipeline with PCQM4Mv2 download
+fb6f05b759f3bbdc87a766d46dec349703974877,2025-11-02,Delete scripts/test_data_loading.py
+9aa831158728b3c57d6e309b218deef85fa75f08,2025-11-02,Delete scripts/test_mol_nist_mapping.py
+01c3a0bec252fb6b8c9445d8a5d7c57c70bd7fc7,2025-11-02,Delete scripts/test_training.py
+fd9ac7a5841ccfde7010950255f68992c8387b38,2025-11-02,Merge pull request #28 from turnDeep/claude/fix-readme-md-011CUi72nASxwpeLbKgQTMV8
+82c572d9f754669d779e590d1e4db561e6ea5558,2025-11-02,README.mdを正確に修正
+df1586420085ebb5bc9b1643c054465c3d547e0e,2025-11-02,Merge pull request #27 from turnDeep/claude/add-pcqm4mv2-download-011CUi5tthWWdRaxwQALDArL
+c786f2f496c05b0d73bdcae2dbd8725d34c28116,2025-11-02,PCQM4Mv2データダウンロードパスをdata/に統一
+ad2f4590b8a069045c796964e401818ddbfc2692,2025-11-02,Merge pull request #26 from turnDeep/claude/implement-pretraining-proposal-011CUi2rZ4A1dpEfY2sL8atR
+37377e40792e14d5744bc11cb422c0d346ffa962,2025-11-01,PCQM4Mv2事前学習機能の実装
+8c778c9167146486d97d70232fc8419ed4ef362d,2025-11-02,Merge pull request #25 from turnDeep/claude/bitspec-ei-ms-pretraining-011CUi1YPU5hPZkMRboygTAB
+1fa7ca9df915142bf3414cb9d27ab1291cb13316,2025-11-01,PCQM4Mv2事前学習の適用可能性調査と提案書作成
+52232e762e4f8c74d978a105d10713d5824a6821,2025-11-02,Merge pull request #24 from turnDeep/claude/mol-to-smiles-attention-011CUhDxwLJTnyoXj5g3tnnK
+4406639ef3ece5397f14a24aab5ec191fff30c1a,2025-11-01,特徴量次元を大幅削減（ノード155→48次元、エッジ16→6次元）
+ceb03f1363e589fe0aa179de18e5d36cf602ffd4,2025-11-01,Merge pull request #23 from turnDeep/claude/simplify-loss-functions-011CUhDiQ9g5SwdE8CgGcpCD
+96f867010218ea12a36f07c5c0696b4d5741a5be,2025-11-01,損失関数をModifiedCosineLossのみに簡略化
+0af86a29385cd813b86ad8092d26becda3ab6c50,2025-11-01,Merge pull request #22 from turnDeep/claude/fix-loss-function-single-011CUgcnrE82go9aZsXj29z1
+204777b9d84420ade5004928de94667cad055da0,2025-11-01,学習・評価時の損失関数をModifiedCosineLossに変更
+235a9c674452d63e96ba85309da844f1e6cf027e,2025-11-01,Merge pull request #21 from turnDeep/claude/ix-readme-md-011CUgaoY5FjbhsDKVNXAVidす
+cf828ea5e8ec5da6782b53459ace81a20a271b1b,2025-11-01,Update README.md with accurate project information
+c679c1021b43eb8ab9d47a41859820fa39954e76,2025-11-01,Merge pull request #20 from turnDeep/claude/ml-mol-nist-mapping-011CUgZsSi3Xdh3frwE3YXdZ
+b957899d46dfc5d9e745f999fae2cbd0ab2d3f23,2025-11-01,機械学習時にMOLファイルとNIST17.MSPのIDマッピングを実装
+afc688752e8119f300c22b000f9ff66c0ae59bfb,2025-10-31,Merge pull request #19 from turnDeep/claude/debug-error-investigation-011CUeNNq76FRsqJsrsjpMTH
+0e7f57a3c6ff071ea5ee8c6d44a24de15f80936f,2025-10-31,Fix claude command not found error for devuser
+e74b20bd4447f5c21ce0de3933e31fdd08fb3377,2025-10-31,Merge pull request #18 from turnDeep/claude/fix-error-011CUeN6iehMSx82b8UdUCDF
+b882f0f7b948845435b4e721e4187237ea4c5b5b,2025-10-31,Fix Dev Container startup error by creating required directories
+32d09d6b31e753f97e3e27dbc33d5e31bed44512,2025-10-31,Merge pull request #17 from turnDeep/claude/fix-claude-command-not-found-011CUeLoN2sT6tAzdGkzmRAw
+e8d4656c0a777cdd182c1dc10fea3010c1539c64,2025-10-31,Fix claude command not found error by installing Claude CLI
+822cb7deb7043aedb994649d30ad1893b85c789b,2025-10-31,Merge pull request #16 from turnDeep/claude/fix-error-011CUeLEamBHizwnsXfGsoUU
+e55809a747e46b3b110539832dd96014587106bd,2025-10-31,Fix pip install error by filtering pip options from requirements.txt
+522e75122604eb7fe60d2369ef2999d68f145b06,2025-10-31,Merge pull request #15 from turnDeep/claude/fix-error-011CUeHHCRV8T5J5RjMJFpik
+4b15d6080f11e6ad7bdf9e0d563edf51102353e0,2025-10-30,Fix symbolic link creation error in Dockerfile
+778ea75dd46610275e0b62dd120e80870177cb3c,2025-10-30,Merge pull request #14 from turnDeep/claude/debug-dev-container-commands-011CUdE2toLtbahcbHExdBHK
+a313974e323151d1506f1f604289577605fd7526,2025-10-30,Fix Python command availability in dev container
+eb779f81029a253a1a55f2cda0702bc983c09074,2025-10-30,Merge pull request #13 from turnDeep/claude/fix-error-011CUbpz4XyT8UENfsKkwjzS
+3360656620cfb3faaeab6dcf26a2d41ab3795f75,2025-10-29,Fix misleading claude-code command in README
+135aff8670f247c920ee6360d7ddf71117cbc34b,2025-10-30,Merge pull request #12 from turnDeep/claude/fix-error-011CUbpisbUisVCWugsYRadt
+9f0b29c654d4707da838eb9e0c2d68bb24d23ac3,2025-10-29,Fix requirements.txt syntax error
+045f06a088c1360ad61fa554ac46ec8d120728f0,2025-10-30,Merge pull request #11 from turnDeep/claude/fix-error-011CUbpT2LQJD6fjwcQ56yZS
+1fd361995d4c937761e911aaa721623651a27167,2025-10-29,Fix duplicate mount point error in devcontainer.json
+282b3ad34b2d44ed9c361f2017a33e7d62be1b19,2025-10-30,Merge pull request #10 from turnDeep/claude/sm-120-gpu-optimization-011CUbmwvCWtRaHTixHCXuaK
+4d0c404476307cf57e835017a92b9c2bcecb526c,2025-10-29,Fix torch-scatter installation error for sm_120 GPU
+9f1a4c520c4e44f7076325589bce70bd3a1bd16b,2025-10-30,Merge pull request #9 from turnDeep/claude/fix-torch-scatter-build-011CUbko1HzNawV4mrUqKuZ9
+f0c51d3eb7144f66ac0b9f3d84448b3306e1f131,2025-10-29,Fix torch-scatter build by disabling pip build isolation
+01cde930fe3dab043314ae0d96e55339fd5507bb,2025-10-30,Merge pull request #8 from turnDeep/claude/fix-torch-scatter-build-011CUbkJmk7o2cxZDR7e7Gr3
+7b5bb3c5757bfa76c8126df13892109f8bf8fc8c,2025-10-29,Fix torch-scatter build error by using pre-built PyG wheels
+ed4f76d7e047efff3848c8e6e46a2b75ec5a2241,2025-10-30,Merge pull request #7 from turnDeep/claude/debug-error-investigation-011CUbj8zUSXs3F3ARRBG4HS
+4f8b7ef1dda61e271df366942c5231c485ef4870,2025-10-29,Fix Docker image tag for NVIDIA CUDA
+6d603ebbd3be46a06f2263bdfdf2a8613b382599,2025-10-29,Merge pull request #6 from turnDeep/claude/verify-cuda-pytorch-compatibility-011CUaoBrprmUkdP2vmbJZfn
+b4b50d48e668642eda7869376b786ba5378a3b87,2025-10-29,Update requirements.txt for RTX 50 series (sm_120) compatibility
+9d947a298c80ed9055fe3df9646be3c22555a128,2025-10-29,Merge pull request #5 from turnDeep/claude/add-claude-code-support-011CUagGQkYC5J8nhgZPueSu
+1760ca78cb3f45f41564594e9b24804bcf8e7b6b,2025-10-29,Add Claude Code support to BitSpec project
+71e49980b2c0565c254d84a7126d7147cf0f8514,2025-10-29,Merge pull request #4 from turnDeep/claude/session-011CUZywpDyyZ9A5wCSPAu8m
+9d82eeff59c7d201a0e370b09964a443535c7f03,2025-10-28,Add .gitignore to exclude Python cache and build artifacts
+7464022de2821e50b50b40ada471cacbc264aa53,2025-10-28,Add Dev Container setup for BitSpec model training
+44bc1a876b44c313d209aa18822e712ca6c30116,2025-10-28,Add README for mass spectrum prediction project
+e51c7b4c63de87c103f013d4f83f30e934ded8fc,2025-10-28,Add script to preprocess NIST MSP data
+7a446ced9ba5e1f22fb819d8195ac0556af8f347,2025-10-28,Add mass spectrum prediction functionality
+5c4388c9a005891b961ba5cdcac8618ea68b503f,2025-10-28,Implement metrics calculation for spectra comparison
+44aea3311fc119c6acbfa7bddb8cdc6197e27d2d,2025-10-28,Add Trainer class for mass spectrum model training
+10d2aef2158345e19d68438ca9b4a05faa7ddddf,2025-10-28,Implement MassSpectrumDataset and data loaders
+63b3e5ea793f985e1a79edf42fdad5151a22e9b9,2025-10-28,Add RTX 50 compatibility utilities
+9baff56ca74129e36c9cbf3cd2502de7f27a9ece,2025-10-28,Implement SpectrumLoss and FocalLoss classes
+3a622b05c9a267be17b3e8cc1d68752ac8b59752,2025-10-28,Add MassSpecDataset and NISTDataLoader classes
+a78ad301ef97423980ccea0ca3d1b5c25413237c,2025-10-28,Add molecular and substructure featurization classes
+31375fdc15c1e474b8a19f211499c402d9d1cd2a,2025-10-28,Add MOL and NIST MSP file parsers
+5bf020c7a0fd7aa094c8faa022298a4653f585b7,2025-10-28,Initialize data processing module with imports
+1ac1993a81625a503ba2867368eba9323eccadb1,2025-10-28,Add GCN-based mass spectrum prediction model
+045c1309f2a8d1fa6426f0d17d9558370c32c44e,2025-10-28,Create __init__.py for model definitions
+e3038833652b6dffbb51784c0295cb47dd953817,2025-10-28,Initialize __init__.py for the package
+aecd0f6cb0d287a1bd7fad8eb05161e5e22112cf,2025-10-28,Add configuration file for mass spectrum prediction
+e21435aa688c2826496ae9d4c0bfd2e960fa1e68,2025-10-28,Create setup.py for mass spectrum prediction package
+ff9ab6109245082cbafc0d6ce14362b8e6bebc5e,2025-10-28,Add requirements for RTX 50 series and libraries
+42478f7d058a18edfba7e097c963ac81ba3911b9,2025-09-29,Delete .gitignore
+f5b6bb3564d6840961f79689d4f5b23067727c5c,2025-09-29,Merge pull request #3 from turnDeep/refactor-data-structure
+c7e88aacb7186278ca61bf597a2ed886bb19eed0,2025-09-29,refactor: Isolate data files into a dedicated directory
+2814c01ac78b054c9d0f804324a36c986f9bf97e,2025-09-27,Merge pull request #2 from turnDeep/feat/bitspec-gcn-implementation
+9d621bb8770e03cec73af0284820d450dc9b4234,2025-09-27,feat: BitSpec-GCNモデルと完全な訓練パイプラインを実装
+c51cda4f10e3845901e5825ecb7dc605db429575,2025-09-27,Merge pull request #1 from turnDeep/feat/bitspec-gcn-implementation
+f6d727e32ad257a645ea83cd787ca0db1cb7f6b9,2025-09-27,feat: BitSpec-GCNモデルと完全な訓練パイプラインを実装
+fb67578ef884f1507ae359dc3d85979a8467e5bc,2025-09-27,Add files via upload
+093b55112cf06c098ca732c7f34ee8e165a25f88,2025-09-27,Add files via upload
+ad50fff1b1780d17788eebfcb17917ac1ae98a1c,2025-09-27,Delete NIST17.MSP
+892b22ed48b4d0d24ab403fc470ca589ff6d0c55,2025-09-27,Add files via upload
+1123c1e9bb7d08309a9a37e99f8459b6585e677f,2025-09-27,Update README.md
+d2a3565b2a237ec4a4728f875a7029eb132249e1,2025-09-27,Delete gsai0405.py
+ada3ae4861ded52decc883413070f556686caad7,2025-09-27,Delete gsai0406.py
+7ff1e90f8207623ea62e9273c2d224a145eff282,2025-09-27,Delete gsai0408.py
+e4dc2bfe3914d37abd2794f9d071dfc80d9db6b0,2025-09-27,Delete gsai0404.py
+a5e59690c4a4acf2cbddebdee049f74beb174f02,2025-09-27,Delete gsai0403.py
+2befa416c3238b27379bd8e8571455bd22bb4fe7,2025-09-27,Delete gsai0401.py
+2e78b693cc091640fcc46525accaa144fbcaf756,2025-09-27,Delete gsai0331.py
+4e6a6a73e861df1e8959c3fa8986d4d7177b8ec3,2025-09-27,Delete gsai0328.py
+00cd89a1d12fa128fe675bd1a430f5b2f47f6dc1,2025-09-27,Delete gsai0327.py
+1de66a12e426c3e305c0ae28a333faa641b4e780,2025-09-27,Delete dockerfile
+a39a4d5834b4fc49e41b2219aed907796f078822,2025-09-27,Delete Specialized_model.inpyb
+a26b059e743ed57161e16486cdbaa3cbb29d09c4,2025-09-27,Delete LLM-massformer.inpyb
+0a3ad9e25fd057509ee4291e3135a4411f6fee27,2025-09-27,Delete LICENSE
+e166c056cc0c4cd6a3bbec92b0bf2b1a9b63a71c,2025-09-27,Delete Hybrid-Generalized-massformer.inpyb
+92561ac73f453143a9abf52b18b5616583dc4b28,2025-09-27,Delete Hybrid-Generalized-massformer-0325.inpyb
+b20327cf6b9dd13cc8732a494d7e0948bf15e233,2025-09-27,Delete Hybrid-Generalized-massformer-0323.inpyb
+a078e238eb768ca970f9f3e37728dc29cb16421b,2025-09-27,Delete Hybrid-Generalized-massformer-0321.inpyb
+868e38d6f6bb085bfd94a128d64b403e5ef3dd0a,2025-09-27,Delete gsai0501_combined.py
+06b819ee9b380610b02e6cb9e8d4b0d84c503a1c,2025-09-27,Delete gsai0523.py
+4c766a1a18192b046c00c7f9255c2b72bf6664c5,2025-09-27,Delete gsai0527.py
+839334b014d0e822728ba8aae5f718932fc67bdc,2025-09-27,Delete massformer.inpyb
+1f79b807b560e709b61e9572835a7e38bcc349d0,2025-09-27,Delete smiles2ms.py
+343aa84ded707c58ed8d55a209487e24f15a1e28,2025-09-27,Delete .gitignore
+bfca8350f724652e28436a4e81864241af60fc70,2025-09-27,Delete Hybrid-Generalized-massformer-0318-A4500.inpyb
+d9c44fdcac9bfd15c4bb3e22a649829825a727dc,2025-09-27,Delete GCN_model.inpyb
+819b71c359d4fb73df8d7002cbe813da1c623b7f,2025-09-27,Delete Generalized_model.inpyb
+67f3128511ff5e2d99a7acded7ffa9ae9144ca4c,2025-09-27,Delete Dockerfile
+b9dd3939c45ee8582a0594e99d831c01a250faf0,2025-09-27,Delete DiffMS0422.py
+84daf99c55d3dc77c2d9e450c18a06b5b1397e9b,2025-09-27,Delete ei-ms-predictor directory
+8c191a57ac6a7a9f263defb4317fb5d6c0bfb78a,2025-09-27,Initial commit

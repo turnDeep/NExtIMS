@@ -135,7 +135,7 @@ def predict_spectrum(
     logger.info("Generating molecular graph...")
     graph_gen = MinimalGraphGenerator(
         bde_cache_path=bde_cache_path,
-        use_bde_calculator=bde_cache_path is None,  # Use calculator if no cache
+        use_bde_calculator=False,
         default_bde=85.0
     )
 

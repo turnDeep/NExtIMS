@@ -1,0 +1,11 @@
+no,idea,status,source,val_cosine,d_cosine,d_top5,d_top10,d_top20,decision
+1,Radical/Electron-State Head,dedicated head not implemented; radical node feature occlusion available,node-edge-feature-attribution-20260611/feature_occlusion_results.csv,,-1.936394544710396e-08,0.0,0.0,0.0,feature alone showed ~no contribution; dedicated head untested
+2,Hydrogen-Shift Fusion,not implemented in current code,no direct docker-runnable script/log,,,,,,requires implementation before real verification
+3,ACT Fragmentation Cascade,not implemented in current code,no direct docker-runnable script/log,,,,,,requires implementation before real verification
+4,Subformula Head + m/z Fusion,not implemented in current code,no direct docker-runnable script/log,,,,,,requires implementation before real verification
+5,Fragment-DAG Lite,not implemented in current code,no direct docker-runnable script/log,,,,,,requires implementation before real verification
+6,Motif Spectral Memory,proxy tested: motif branch,consensus-motif-50k-20260620/all_50k_comparison_summary.csv,0.39663613626831457,-0.0043233065550465355,-0.0017209325575035794,0.006011317025017393,-0.0006750968128870771,mixed; Top10 improved but cosine/Top5/Top20 did not beat raw baseline
+7,Molecular-Ion Observability Gate,proxy tested: bounded variable ACT fusion gate,neutral-fusion-gate-random50k-20260620/fixed_vs_bounded_variable_comparison.csv,0.4037601673429171,-7.436032040192275E-05,4.0515315397449125E-05,-4.052072521931738E-05,-0.0009420540189820081,fixed fusion remained slightly better/stabler
+8,Replicate-Aware Spectrum Distribution,proxy tested: consensus by canonical structure,consensus-motif-50k-20260620/all_50k_comparison_summary.csv,0.3927158932936819,-0.008243549529679206,-0.003911328433352429,-0.0012759655250262902,-0.0051927918469495404,simple consensus averaging worsened metrics
+9,Isomer-Contrastive Delta Spectrum,not implemented in current code,no direct docker-runnable script/log,,,,,,requires pair construction and contrastive/delta loss
+10,Peak-Relation Graph Loss,proxy tested: peak-presence fusion sweep,peak-presence-20260621/peak_presence_top20_loss002_gate_sweep.csv,0.401189089207827,0.0012630960350098475,-0.0019448958880704248,-0.0007901195575584219,0.003312399167102631,"mixed; cosine/Top20 up, Top5/Top10 down"
